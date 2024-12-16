@@ -32,16 +32,23 @@ Module Par.
   (****************** Eta ***********************)
   | AppEta a0 a1 :
     R a0 a1 ->
-    R a0 (Abs (ren_Tm shift a1))
+    R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
     R a0 (Pair a1 a1)
 
   (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
   | AppCong a0 a1 b0 b1 :
     R a0 a1 ->
     R b0 b1 ->
     R (App a0 b0) (App a1 b1)
+  | PairCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Pair a0 b0) (Pair a1 b1)
   | Proj1Cong a0 a1 :
     R a0 a1 ->
     R (Proj1 a0) (Proj1 a1)
@@ -78,10 +85,17 @@ Module RPar.
     R (Proj2 (Pair a0 b)) a1
 
   (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
   | AppCong a0 a1 b0 b1 :
     R a0 a1 ->
     R b0 b1 ->
     R (App a0 b0) (App a1 b1)
+  | PairCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Pair a0 b0) (Pair a1 b1)
   | Proj1Cong a0 a1 :
     R a0 a1 ->
     R (Proj1 a0) (Proj1 a1)
@@ -95,16 +109,23 @@ Module EPar.
   (****************** Eta ***********************)
   | AppEta a0 a1 :
     R a0 a1 ->
-    R a0 (Abs (ren_Tm shift a1))
+    R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
     R a0 (Pair a1 a1)
 
   (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
   | AppCong a0 a1 b0 b1 :
     R a0 a1 ->
     R b0 b1 ->
     R (App a0 b0) (App a1 b1)
+  | PairCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Pair a0 b0) (Pair a1 b1)
   | Proj1Cong a0 a1 :
     R a0 a1 ->
     R (Proj1 a0) (Proj1 a1)
@@ -116,4 +137,26 @@ End EPar.
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
 
-Lemma EPar_
+Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
+Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
+
+Lemma merge n (t a u : Tm n) :
+  EPar.R t a ->
+  RPar.R a u ->
+  Par.R t u.
+Proof.
+  move => h. move : u.
+  elim:t a/h.
+  - move => n0 a0 a1 ha iha u hu.
+    apply iha.
+    inversion hu; subst.
+
+
+  - hauto lq:on inv:RPar.R.
+  - move => a0 a1 b0 b1 ha iha hb ihb u.
+    inversion 1; subst.
+    + inversion ha.
+
+best use:EPar_Par, RPar_Par.
+
+  best ctrs:Par.R inv:EPar.R,RPar.R use:EPar_Par, RPar_Par.
