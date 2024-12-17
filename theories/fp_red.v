@@ -1,6 +1,8 @@
 Require Import ssreflect.
+From stdpp Require Import relations (rtc (..)).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
+
 
 (* Trying my best to not write C style module_funcname *)
 Module Par.
@@ -175,6 +177,8 @@ Module EPar.
 
     all : qauto ctrs:R.
   Qed.
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 End EPar.
 
 
@@ -182,23 +186,104 @@ Local Ltac com_helper :=
   split; [hauto lq:on ctrs:RPar.R use: RPar.refl, RPar.renaming
          |hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming].
 
-Lemma commutativity n (a b0 b1 : Tm n) : EPar.R a b0 -> RPar.R a b1 -> exists c, RPar.R b0 c /\ EPar.R b1 c.
+Lemma RPars_AbsCong n (a b : Tm (S n)) :
+  rtc RPar.R a b ->
+  rtc RPar.R (Abs a) (Abs b).
+Proof. induction 1; hauto l:on ctrs:RPar.R, rtc. Qed.
+
+Lemma RPars_AppCong n (a0 a1 b : Tm n) :
+  rtc RPar.R a0 a1 ->
+  rtc RPar.R (App a0 b) (App a1 b).
+Proof.
+  move => h. move : b.
+  elim : a0 a1 /h.
+  - qauto ctrs:RPar.R, rtc.
+  - move => x y z h0 h1 ih b.
+    apply rtc_l with (y := App y b) => //.
+    hauto lq:on ctrs:RPar.R use:RPar.refl.
+Qed.
+
+Lemma RPars_PairCong n (a0 a1 b0 b1 : Tm n) :
+  rtc RPar.R a0 a1 ->
+  rtc RPar.R b0 b1 ->
+  rtc RPar.R (Pair a0 b0) (Pair a1 b1).
+Proof.
+  move => h. move : b0 b1.
+  elim : a0 a1 /h.
+  - move => x b0 b1 h.
+    elim : b0 b1 /h.
+    by auto using rtc_refl.
+    move => x0 y z h0 h1 h2.
+    apply : rtc_l; eauto.
+    by eauto using RPar.refl, RPar.PairCong.
+  - move => x y z h0 h1 ih b0 b1 h.
+    apply : rtc_l; eauto.
+    by eauto using RPar.refl, RPar.PairCong.
+Qed.
+
+
+Lemma RPars_renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
+  rtc RPar.R a0 a1 ->
+  rtc RPar.R (ren_Tm ξ a0) (ren_Tm ξ a1).
+Proof.
+  induction 1.
+  - apply rtc_refl.
+  - eauto using RPar.renaming, rtc_l.
+Qed.
+
+Lemma commutativity n (a b0 b1 : Tm n) : EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
 Proof.
   move => h. move : b1.
   elim : n a b0 / h.
   - move => n a b0 ha iha b1 hb.
     move : iha (hb) => /[apply].
     move => [c [ih0 ih1]].
-    exists (Abs (App (ren_Tm shift c) (VarTm var_zero))); com_helper.
+    exists (Abs (App (ren_Tm shift c) (VarTm var_zero))).
+    split.
+    + sfirstorder use:RPars_AbsCong, RPars_AppCong, RPars_renaming.
+    + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
-    exists (Pair c c); com_helper.
-  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
-  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
+    exists (Pair c c). split.
+    + by apply RPars_PairCong.
+    + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
+  - admit. (* hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R. *)
+  - admit. (* hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R. *)
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
-    elim /RPar.inv => //=.
+    elim /RPar.inv => //= _.
+    + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
+      elim /EPar.inv : ha => //= _.
+      * move => a0 a4 h *. subst.
+        move /ihb : h1 {ihb}.
+        move => [c [hb1 hb4]].
+        have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
+        move => [c0 [hc0 hc1]].
+        eexists.
+        split.
+        ** apply RPar.AppAbs; eauto.
+           eauto using RPar.refl.
+        ** simpl.
 
 
+      admit.
+    + move => a2 a3 b3 b4 c0 c1 h0 h1 h2 [*]. subst.
+      admit.
+    + hauto lq:on ctrs:RPar.R, EPar.R.
+  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
+  - move => n a b0 h0 ih0 b1.
+    elim /RPar.inv => //= _.
+    + move => a0 a1 h [*]. subst.
+      admit.
+    + move => a0 ? a1 h1 [*]. subst.
+      admit.
+    + hauto lq:on ctrs:RPar.R, EPar.R.
+  - move => n a b0 h0 ih0 b1.
+    elim /RPar.inv => //= _.
+    + move => a0 a1 ha [*]. subst.
+      admit.
+    + move => a0 a1 b2 h [*]. subst.
+      admit.
+    + hauto lq:on ctrs:RPar.R, EPar.R.
 Admitted.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
