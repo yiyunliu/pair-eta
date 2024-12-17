@@ -231,7 +231,17 @@ Proof.
   - eauto using RPar.renaming, rtc_l.
 Qed.
 
-Lemma commutativity n (a b0 b1 : Tm n) : EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
+Lemma RPars_Abs_inv n (a : Tm (S n)) b :
+  rtc RPar.R (Abs a) b -> exists a', b = Abs a' /\ rtc RPar.R a a'.
+Proof.
+  move E : (Abs a) => b0 h. move : a E.
+  elim : b0 b / h.
+  - hauto lq:on ctrs:rtc.
+  - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
+Qed.
+
+Lemma commutativity n (a b0 b1 : Tm n) :
+  EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
 Proof.
   move => h. move : b1.
   elim : n a b0 / h.
@@ -247,8 +257,11 @@ Proof.
     exists (Pair c c). split.
     + by apply RPars_PairCong.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
-  - admit. (* hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R. *)
-  - admit. (* hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R. *)
+  - hauto l:on ctrs:rtc inv:RPar.R.
+  - move => n a0 a1 h ih b1.
+    elim /RPar.inv => //= _.
+    move => a2 a3 ? [*]. subst.
+    hauto lq:on ctrs:rtc, RPar.R, EPar.R use:RPars_AbsCong.
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
     elim /RPar.inv => //= _.
     + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
