@@ -6,7 +6,6 @@ Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
 Module Par.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
   (***************** Beta ***********************)
-  | Var i : R (VarTm i) (VarTm i)
   | AppAbs a0 a1 b0 b1 :
     R a0 a1 ->
     R b0 b1 ->
@@ -38,6 +37,7 @@ Module Par.
     R a0 (Pair a1 a1)
 
   (*************** Congruence ********************)
+  | Var i : R (VarTm i) (VarTm i)
   | AbsCong a0 a1 :
     R a0 a1 ->
     R (Abs a0) (Abs a1)
@@ -61,7 +61,6 @@ End Par.
 Module RPar.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
   (***************** Beta ***********************)
-  | Var i : R (VarTm i) (VarTm i)
   | AppAbs a0 a1 b0 b1 :
     R a0 a1 ->
     R b0 b1 ->
@@ -85,6 +84,7 @@ Module RPar.
     R (Proj2 (Pair a0 b)) a1
 
   (*************** Congruence ********************)
+  | Var i : R (VarTm i) (VarTm i)
   | AbsCong a0 a1 :
     R a0 a1 ->
     R (Abs a0) (Abs a1)
@@ -102,6 +102,30 @@ Module RPar.
   | Proj2Cong a0 a1 :
     R a0 a1 ->
     R (Proj2 a0) (Proj2 a1).
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+  Lemma refl n (a : Tm n) : R a a.
+  Proof.
+    induction a; hauto lq:on ctrs:R.
+  Qed.
+
+  Lemma AppAbs' n a0 a1 (b0 b1 t : Tm n) :
+    t = subst_Tm (scons b1 VarTm) a1 ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App (Abs a0) b0) t.
+  Proof. move => ->. apply AppAbs. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h.
+    move => *; apply : AppAbs'; eauto; by asimpl.
+    all : qauto ctrs:R.
+  Qed.
+
 End RPar.
 
 Module EPar.
@@ -115,6 +139,7 @@ Module EPar.
     R a0 (Pair a1 a1)
 
   (*************** Congruence ********************)
+  | Var i : R (VarTm i) (VarTm i)
   | AbsCong a0 a1 :
     R a0 a1 ->
     R (Abs a0) (Abs a1)
@@ -132,7 +157,49 @@ Module EPar.
   | Proj2Cong a0 a1 :
     R a0 a1 ->
     R (Proj2 a0) (Proj2 a1).
+
+  Lemma refl n (a : Tm n) : EPar.R a a.
+  Proof.
+    induction a; hauto lq:on ctrs:EPar.R.
+  Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h.
+
+    move => n a0 a1 ha iha m ξ /=.
+    move /(_ _ ξ) /AppEta : iha.
+    by asimpl.
+
+    all : qauto ctrs:R.
+  Qed.
 End EPar.
+
+
+Local Ltac com_helper :=
+  split; [hauto lq:on ctrs:RPar.R use: RPar.refl, RPar.renaming
+         |hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming].
+
+Lemma commutativity n (a b0 b1 : Tm n) : EPar.R a b0 -> RPar.R a b1 -> exists c, RPar.R b0 c /\ EPar.R b1 c.
+Proof.
+  move => h. move : b1.
+  elim : n a b0 / h.
+  - move => n a b0 ha iha b1 hb.
+    move : iha (hb) => /[apply].
+    move => [c [ih0 ih1]].
+    exists (Abs (App (ren_Tm shift c) (VarTm var_zero))); com_helper.
+  - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
+    move => [c [ih0 ih1]].
+    exists (Pair c c); com_helper.
+  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
+  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
+  - move => n a0 a1 b0 b1 ha iha hb ihb b2.
+    elim /RPar.inv => //=.
+
+
+Admitted.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
