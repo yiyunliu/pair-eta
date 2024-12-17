@@ -36,7 +36,7 @@ Module Par.
     R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
-    R a0 (Pair a1 a1)
+    R a0 (Pair (Proj1 a1) (Proj2 a1))
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -138,7 +138,7 @@ Module EPar.
     R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
-    R a0 (Pair a1 a1)
+    R a0 (Pair (Proj1 a1) (Proj2 a1))
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -239,6 +239,41 @@ Proof.
   - hauto lq:on ctrs:rtc.
   - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
 Qed.
+
+Lemma Abs_EPar n a (b : Tm n) :
+  EPar.R (Abs a) b ->
+  forall c, exists d,
+    EPar.R (subst_Tm (scons c VarTm) a) d /\
+      rtc RPar.R (App b c) d.
+Proof.
+  move E : (Abs a) => u h.
+  move : a E.
+  elim : n u b /h => //=.
+  - move => n a0 a1 ha iha b ? c. subst.
+    specialize iha with (1 := eq_refl) (c := c).
+    move : iha => [d [ih0 ih1]].
+    exists d.
+    split => //.
+    apply : rtc_l.
+    apply RPar.AppAbs; eauto => //=.
+    apply RPar.refl.
+    by apply RPar.refl.
+    by asimpl.
+  - move => n a0 a1 ha iha a ? c. subst.
+    specialize iha with (1 := eq_refl) (c := c).
+    move : iha => [d [ih0 ih1]].
+    exists (Pair (Proj1 d) (Proj2 d)). split => //.
+    + move { ih1}.
+      hauto lq:on ctrs:EPar.R.
+    + apply : rtc_l.
+      apply RPar.AppPair.
+      admit.
+      admit.
+      apply RPar.refl.
+      admit.
+  - admit.
+Admitted.
+
 
 Lemma commutativity n (a b0 b1 : Tm n) :
   EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
