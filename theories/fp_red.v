@@ -242,36 +242,49 @@ Qed.
 
 Lemma Abs_EPar n a (b : Tm n) :
   EPar.R (Abs a) b ->
-  forall c, exists d,
+  (forall c m (ξ : fin n -> fin m), exists d,
     EPar.R (subst_Tm (scons c VarTm) a) d /\
-      rtc RPar.R (App b c) d.
+      rtc RPar.R (App b c) d) /\
+         (exists d,
+         EPar.R a d /\
+         rtc RPar.R (Proj1 b) (Abs (Proj1 d)) /\
+         rtc RPar.R (Proj2 b) (Abs (Proj2 d))).
 Proof.
-  move E : (Abs a) => u h.
-  move : a E.
-  elim : n u b /h => //=.
-  - move => n a0 a1 ha iha b ? c. subst.
-    specialize iha with (1 := eq_refl) (c := c).
-    move : iha => [d [ih0 ih1]].
-    exists d.
-    split => //.
-    apply : rtc_l.
-    apply RPar.AppAbs; eauto => //=.
-    apply RPar.refl.
-    by apply RPar.refl.
-    by asimpl.
-  - move => n a0 a1 ha iha a ? c. subst.
-    specialize iha with (1 := eq_refl) (c := c).
-    move : iha => [d [ih0 ih1]].
-    exists (Pair (Proj1 d) (Proj2 d)). split => //.
-    + move { ih1}.
-      hauto lq:on ctrs:EPar.R.
-    + apply : rtc_l.
-      apply RPar.AppPair.
-      admit.
-      admit.
-      apply RPar.refl.
-      admit.
-  - admit.
+(*   move E : (Abs a) => u h. *)
+(*   move : a E. *)
+(*   elim : n u b /h => //=. *)
+(*   - move => n a0 a1 ha iha b ?. subst. *)
+(*     split. *)
+(*     + move => c. *)
+(*       specialize iha with (1 := eq_refl). *)
+(*       move : iha => [+ _]. move /(_ c) => [d [ih0 ih1]]. *)
+(*       exists d. *)
+(*       split => //. *)
+(*       apply : rtc_l. *)
+(*       apply RPar.AppAbs; eauto => //=. *)
+(*       apply RPar.refl. *)
+(*       by apply RPar.refl. *)
+(*       by asimpl. *)
+(*     + specialize iha with (1 := eq_refl). *)
+(*       move : iha => [_ [d [ih0 [ih1 ih2]]]]. *)
+(*       exists d. *)
+(*       repeat split => //. *)
+(*       * apply : rtc_l. apply : RPar.Proj1Abs. apply RPar.refl. *)
+(*       apply : RPars_AbsCong. *)
+(*       apply *)
+(*   - move => n a0 a1 ha iha a ? c. subst. *)
+(*     specialize iha with (1 := eq_refl) (c := c). *)
+(*     move : iha => [d [ih0 ih1]]. *)
+(*     exists (Pair (Proj1 d) (Proj2 d)). split => //. *)
+(*     + move { ih1}. *)
+(*       hauto lq:on ctrs:EPar.R. *)
+(*     + apply : rtc_l. *)
+(*       apply RPar.AppPair. *)
+(*       admit. *)
+(*       admit. *)
+(*       apply RPar.refl. *)
+(*       admit. *)
+(*   - admit. *)
 Admitted.
 
 
@@ -289,8 +302,8 @@ Proof.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
-    exists (Pair c c). split.
-    + by apply RPars_PairCong.
+    exists (Pair (Proj1 c) (Proj2 c)). split.
+    + apply RPars_PairCong; admit.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - hauto l:on ctrs:rtc inv:RPar.R.
   - move => n a0 a1 h ih b1.
@@ -300,6 +313,9 @@ Proof.
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
     elim /RPar.inv => //= _.
     + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
+      have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
+      move => [c [ih0 ih1]].
+
       elim /EPar.inv : ha => //= _.
       * move => a0 a4 h *. subst.
         move /ihb : h1 {ihb}.
