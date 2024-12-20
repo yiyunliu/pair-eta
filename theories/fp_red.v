@@ -133,12 +133,10 @@ End RPar.
 Module EPar.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
   (****************** Eta ***********************)
-  | AppEta a0 a1 :
-    R a0 a1 ->
-    R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
-  | PairEta a0 a1 :
-    R a0 a1 ->
-    R a0 (Pair (Proj1 a1) (Proj2 a1))
+  | AppEta a :
+    R a (Abs (App (ren_Tm shift a) (VarTm var_zero)))
+  | PairEta a :
+    R a (Pair (Proj1 a) (Proj2 a))
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -165,20 +163,29 @@ Module EPar.
     induction a; hauto lq:on ctrs:EPar.R.
   Qed.
 
+  Lemma AppEta' n (a b : Tm n) :
+    b = (Abs (App (ren_Tm shift a) (VarTm var_zero))) ->
+    R a b.
+  Proof. move => ->. by apply AppEta. Qed.
+
   Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
     R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
   Proof.
     move => h. move : m ξ.
     elim : n a b /h.
-
-    move => n a0 a1 ha iha m ξ /=.
-    move /(_ _ ξ) /AppEta : iha.
-    by asimpl.
-
+    move => n a m ξ /=.
+    apply AppEta'. by asimpl.
     all : qauto ctrs:R.
   Qed.
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+  Lemma morph n m (a : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    R (subst_Tm ρ0 a) (subst_Tm ρ1 a).
+  Proof.
+    move : m ρ0 ρ1.
+
 End EPar.
 
 
