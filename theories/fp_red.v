@@ -311,7 +311,6 @@ Proof.
       apply rtc_once. apply : RPar.Proj2Abs; eauto using RPar.refl.
 Qed.
 
-
 Lemma commutativity n (a b0 b1 : Tm n) :
   EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
 Proof.
@@ -322,23 +321,26 @@ Proof.
     move => [c [ih0 ih1]].
     exists (Abs (App (ren_Tm shift c) (VarTm var_zero))).
     split.
-    + sfirstorder use:RPars_AbsCong, RPars_AppCong, RPars_renaming.
+    + sfirstorder use:RPars.AbsCong, RPars.AppCong, RPars.renaming.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
     exists (Pair (Proj1 c) (Proj2 c)). split.
-    + apply RPars_PairCong; admit.
+    + apply RPars.PairCong.
+      by apply RPars.Proj1Cong.
+      by apply RPars.Proj2Cong.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - hauto l:on ctrs:rtc inv:RPar.R.
   - move => n a0 a1 h ih b1.
     elim /RPar.inv => //= _.
     move => a2 a3 ? [*]. subst.
-    hauto lq:on ctrs:rtc, RPar.R, EPar.R use:RPars_AbsCong.
+    hauto lq:on ctrs:rtc, RPar.R, EPar.R use:RPars.AbsCong.
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
     elim /RPar.inv => //= _.
     + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
       have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
-      move => [c [ih0 ih1]].
+      move => [c [ih0 /Abs_EPar [ih1 ih2]]].
+
 
       elim /EPar.inv : ha => //= _.
       * move => a0 a4 h *. subst.
