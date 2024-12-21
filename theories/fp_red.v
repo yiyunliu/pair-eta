@@ -186,92 +186,89 @@ Local Ltac com_helper :=
   split; [hauto lq:on ctrs:RPar.R use: RPar.refl, RPar.renaming
          |hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming].
 
-Lemma RPars_AbsCong n (a b : Tm (S n)) :
-  rtc RPar.R a b ->
-  rtc RPar.R (Abs a) (Abs b).
-Proof. induction 1; hauto l:on ctrs:RPar.R, rtc. Qed.
+Module RPars.
 
-Lemma RPars_AppCong n (a0 a1 b : Tm n) :
-  rtc RPar.R a0 a1 ->
-  rtc RPar.R (App a0 b) (App a1 b).
-Proof.
-  move => h. move : b.
-  elim : a0 a1 /h.
-  - qauto ctrs:RPar.R, rtc.
-  - move => x y z h0 h1 ih b.
-    apply rtc_l with (y := App y b) => //.
-    hauto lq:on ctrs:RPar.R use:RPar.refl.
-Qed.
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc RPar.R a b ->
+    rtc RPar.R (Abs a) (Abs b).
+  Proof. induction 1; hauto l:on ctrs:RPar.R, rtc. Qed.
 
-Lemma RPars_PairCong n (a0 a1 b0 b1 : Tm n) :
-  rtc RPar.R a0 a1 ->
-  rtc RPar.R b0 b1 ->
-  rtc RPar.R (Pair a0 b0) (Pair a1 b1).
-Proof.
-  move => h. move : b0 b1.
-  elim : a0 a1 /h.
-  - move => x b0 b1 h.
-    elim : b0 b1 /h.
-    by auto using rtc_refl.
-    move => x0 y z h0 h1 h2.
-    apply : rtc_l; eauto.
-    by eauto using RPar.refl, RPar.PairCong.
-  - move => x y z h0 h1 ih b0 b1 h.
-    apply : rtc_l; eauto.
-    by eauto using RPar.refl, RPar.PairCong.
-Qed.
+  Lemma AppCong n (a0 a1 b : Tm n) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R (App a0 b) (App a1 b).
+  Proof.
+    move => h. move : b.
+    elim : a0 a1 /h.
+    - qauto ctrs:RPar.R, rtc.
+    - move => x y z h0 h1 ih b.
+      apply rtc_l with (y := App y b) => //.
+      hauto lq:on ctrs:RPar.R use:RPar.refl.
+  Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R b0 b1 ->
+    rtc RPar.R (Pair a0 b0) (Pair a1 b1).
+  Proof.
+    move => h. move : b0 b1.
+    elim : a0 a1 /h.
+    - move => x b0 b1 h.
+      elim : b0 b1 /h.
+      by auto using rtc_refl.
+      move => x0 y z h0 h1 h2.
+      apply : rtc_l; eauto.
+      by eauto using RPar.refl, RPar.PairCong.
+    - move => x y z h0 h1 ih b0 b1 h.
+      apply : rtc_l; eauto.
+      by eauto using RPar.refl, RPar.PairCong.
+  Qed.
 
 
-Lemma RPars_renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
-  rtc RPar.R a0 a1 ->
-  rtc RPar.R (ren_Tm ξ a0) (ren_Tm ξ a1).
-Proof.
-  induction 1.
-  - apply rtc_refl.
-  - eauto using RPar.renaming, rtc_l.
-Qed.
+  Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R (ren_Tm ξ a0) (ren_Tm ξ a1).
+  Proof.
+    induction 1.
+    - apply rtc_refl.
+    - eauto using RPar.renaming, rtc_l.
+  Qed.
 
-Lemma RPars_Abs_inv n (a : Tm (S n)) b :
-  rtc RPar.R (Abs a) b -> exists a', b = Abs a' /\ rtc RPar.R a a'.
-Proof.
-  move E : (Abs a) => b0 h. move : a E.
-  elim : b0 b / h.
-  - hauto lq:on ctrs:rtc.
-  - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
-Qed.
+  Lemma Abs_inv n (a : Tm (S n)) b :
+    rtc RPar.R (Abs a) b -> exists a', b = Abs a' /\ rtc RPar.R a a'.
+  Proof.
+    move E : (Abs a) => b0 h. move : a E.
+    elim : b0 b / h.
+    - hauto lq:on ctrs:rtc.
+    - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
+  Qed.
+End RPars.
 
 Lemma Abs_EPar n a (b : Tm n) :
   EPar.R (Abs a) b ->
-  (forall c m (ξ : fin n -> fin m), exists d,
-    EPar.R (subst_Tm (scons c VarTm) a) d /\
-      rtc RPar.R (App b c) d) /\
+  (exists d, EPar.R a d /\
+     rtc RPar.R (App (ren_Tm shift b) (VarTm var_zero)) d) /\
          (exists d,
          EPar.R a d /\
          rtc RPar.R (Proj1 b) (Abs (Proj1 d)) /\
          rtc RPar.R (Proj2 b) (Abs (Proj2 d))).
 Proof.
-(*   move E : (Abs a) => u h. *)
-(*   move : a E. *)
-(*   elim : n u b /h => //=. *)
-(*   - move => n a0 a1 ha iha b ?. subst. *)
-(*     split. *)
-(*     + move => c. *)
-(*       specialize iha with (1 := eq_refl). *)
-(*       move : iha => [+ _]. move /(_ c) => [d [ih0 ih1]]. *)
-(*       exists d. *)
-(*       split => //. *)
-(*       apply : rtc_l. *)
-(*       apply RPar.AppAbs; eauto => //=. *)
-(*       apply RPar.refl. *)
-(*       by apply RPar.refl. *)
-(*       by asimpl. *)
-(*     + specialize iha with (1 := eq_refl). *)
-(*       move : iha => [_ [d [ih0 [ih1 ih2]]]]. *)
-(*       exists d. *)
-(*       repeat split => //. *)
-(*       * apply : rtc_l. apply : RPar.Proj1Abs. apply RPar.refl. *)
-(*       apply : RPars_AbsCong. *)
-(*       apply *)
+  move E : (Abs a) => u h.
+  move : a E.
+  elim : n u b /h => //=.
+  - move => n a0 a1 ha iha b ?. subst.
+    specialize iha with (1 := eq_refl).
+    move : iha => [[d [ih0 ih1]] _].
+    split; exists d.
+    + split => //.
+      apply : rtc_l.
+      apply RPar.AppAbs; eauto => //=.
+      apply RPar.refl.
+      by apply RPar.refl.
+      move :ih1; substify; by asimpl.
+    + repeat split => //.
+      * apply : rtc_l. apply : RPar.Proj1Abs. apply RPar.refl.
+        apply : RPars.AbsCong.
+
 (*   - move => n a0 a1 ha iha a ? c. subst. *)
 (*     specialize iha with (1 := eq_refl) (c := c). *)
 (*     move : iha => [d [ih0 ih1]]. *)
