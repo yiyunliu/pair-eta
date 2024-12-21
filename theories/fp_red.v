@@ -128,6 +128,13 @@ Module RPar.
     all : qauto ctrs:R.
   Qed.
 
+  Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    R a b -> R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
+  Proof.
+    move => h. move : m ρ0 ρ1.
+    elim : n a b /h.
+    Admitted.
+
 End RPar.
 
 Module EPar.
@@ -179,6 +186,39 @@ Module EPar.
   Qed.
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+  Lemma AppEta' n (a0 a1 b : Tm n) :
+    b = (Abs (App (ren_Tm shift a1) (VarTm var_zero))) ->
+    R a0 a1 ->
+    R a0 b.
+  Proof. move => ->; apply AppEta. Qed.
+
+  Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    R a b ->
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
+  Proof.
+    move => h. move : m ρ0 ρ1. elim : n a b / h => n.
+    - move => a0 a1 ha iha m ρ0 ρ1 hρ /=.
+      apply : AppEta'; eauto. by asimpl.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - hauto l:on ctrs:R use:renaming inv:option.
+    - hauto q:on ctrs:R.
+    - hauto q:on ctrs:R.
+    - hauto q:on ctrs:R.
+    - hauto q:on ctrs:R.
+  Qed.
+
+  Lemma substing n a0 a1 (b0 b1 : Tm n) :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (subst_Tm (scons b0 VarTm) a0) (subst_Tm (scons b1 VarTm) a1).
+  Proof.
+    move => h0 h1. apply morphing => //.
+    hauto lq:on ctrs:R inv:option.
+  Qed.
+
 End EPar.
 
 
@@ -200,9 +240,10 @@ Module RPars.
     rtc RPar.R (Abs a) (Abs b).
   Proof. solve_s. Qed.
 
-  Lemma AppCong n (a0 a1 b : Tm n) :
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
     rtc RPar.R a0 a1 ->
-    rtc RPar.R (App a0 b) (App a1 b).
+    rtc RPar.R b0 b1 ->
+    rtc RPar.R (App a0 b0) (App a1 b1).
   Proof. solve_s. Qed.
 
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
@@ -290,12 +331,12 @@ Proof.
         by firstorder using RPars.PairCong.
       split.
       * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj1 d))) (VarTm var_zero)).
-        by apply RPars.AppCong.
+        by eauto using RPars.AppCong, rtc_refl.
         apply relations.rtc_once => /=.
         apply : RPar.AppAbs'; eauto using RPar.refl.
         by asimpl.
       * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj2 d))) (VarTm var_zero)).
-        by apply RPars.AppCong.
+        by eauto using RPars.AppCong, rtc_refl.
         apply relations.rtc_once => /=.
         apply : RPar.AppAbs'; eauto using RPar.refl.
         by asimpl.
@@ -321,7 +362,7 @@ Proof.
     move => [c [ih0 ih1]].
     exists (Abs (App (ren_Tm shift c) (VarTm var_zero))).
     split.
-    + sfirstorder use:RPars.AbsCong, RPars.AppCong, RPars.renaming.
+    + hauto lq:on ctrs:rtc use:RPars.AbsCong, RPars.AppCong, RPars.renaming.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
@@ -338,28 +379,19 @@ Proof.
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
     elim /RPar.inv => //= _.
     + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
+      move /(_ _ ltac:(by eauto)) : ihb => [b [ihb0 ihb1]].
       have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
-      move => [c [ih0 /Abs_EPar [ih1 ih2]]].
-
-
-      elim /EPar.inv : ha => //= _.
-      * move => a0 a4 h *. subst.
-        move /ihb : h1 {ihb}.
-        move => [c [hb1 hb4]].
-        have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
-        move => [c0 [hc0 hc1]].
-        eexists.
-        split.
-        ** apply RPar.AppAbs; eauto.
-           eauto using RPar.refl.
-        ** simpl.
-
-
-      admit.
+      move => [c [ih0 /Abs_EPar [[d [ih1 ih2]] _]]].
+      exists (subst_Tm (scons b VarTm) d).
+      split.
+      (* By substitution *)
+      * admit.
+      (* By EPar morphing *)
+      * by apply EPar.substing.
     + move => a2 a3 b3 b4 c0 c1 h0 h1 h2 [*]. subst.
       admit.
-    + hauto lq:on ctrs:RPar.R, EPar.R.
-  - hauto lq:on ctrs:RPar.R, EPar.R inv:RPar.R.
+    + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
+  - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
   - move => n a b0 h0 ih0 b1.
     elim /RPar.inv => //= _.
     + move => a0 a1 h [*]. subst.
