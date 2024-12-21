@@ -1,5 +1,5 @@
 Require Import ssreflect.
-From stdpp Require Import relations (rtc (..)).
+From stdpp Require Import relations (rtc (..), rtc_once).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
 
@@ -28,7 +28,7 @@ Module Par.
     R (Proj2 (Abs a0)) (Abs (Proj2 a0))
   | Proj2Pair a0 a1 b :
     R a0 a1 ->
-    R (Proj2 (Pair a0 b)) a1
+    R (Proj2 (Pair b a0)) a1
 
   (****************** Eta ***********************)
   | AppEta a0 a1 :
@@ -83,7 +83,7 @@ Module RPar.
     R (Proj2 (Abs a0)) (Abs (Proj2 a0))
   | Proj2Pair a0 a1 b :
     R a0 a1 ->
-    R (Proj2 (Pair a0 b)) a1
+    R (Proj2 (Pair b a0)) a1
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -188,41 +188,38 @@ Local Ltac com_helper :=
 
 Module RPars.
 
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:RPar.R use:RPar.refl.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
   Lemma AbsCong n (a b : Tm (S n)) :
     rtc RPar.R a b ->
     rtc RPar.R (Abs a) (Abs b).
-  Proof. induction 1; hauto l:on ctrs:RPar.R, rtc. Qed.
+  Proof. solve_s. Qed.
 
   Lemma AppCong n (a0 a1 b : Tm n) :
     rtc RPar.R a0 a1 ->
     rtc RPar.R (App a0 b) (App a1 b).
-  Proof.
-    move => h. move : b.
-    elim : a0 a1 /h.
-    - qauto ctrs:RPar.R, rtc.
-    - move => x y z h0 h1 ih b.
-      apply rtc_l with (y := App y b) => //.
-      hauto lq:on ctrs:RPar.R use:RPar.refl.
-  Qed.
+  Proof. solve_s. Qed.
 
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
     rtc RPar.R a0 a1 ->
     rtc RPar.R b0 b1 ->
     rtc RPar.R (Pair a0 b0) (Pair a1 b1).
-  Proof.
-    move => h. move : b0 b1.
-    elim : a0 a1 /h.
-    - move => x b0 b1 h.
-      elim : b0 b1 /h.
-      by auto using rtc_refl.
-      move => x0 y z h0 h1 h2.
-      apply : rtc_l; eauto.
-      by eauto using RPar.refl, RPar.PairCong.
-    - move => x y z h0 h1 ih b0 b1 h.
-      apply : rtc_l; eauto.
-      by eauto using RPar.refl, RPar.PairCong.
-  Qed.
+  Proof. solve_s. Qed.
 
+  Lemma Proj1Cong n (a0 a1  : Tm n) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R (Proj1 a0) (Proj1 a1).
+  Proof. solve_s. Qed.
+
+  Lemma Proj2Cong n (a0 a1  : Tm n) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R (Proj2 a0) (Proj2 a1).
+  Proof. solve_s. Qed.
 
   Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
     rtc RPar.R a0 a1 ->
@@ -233,6 +230,11 @@ Module RPars.
     - eauto using RPar.renaming, rtc_l.
   Qed.
 
+  Lemma weakening n (a0 a1 : Tm n) :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R (ren_Tm shift a0) (ren_Tm shift a1).
+  Proof. apply renaming. Qed.
+
   Lemma Abs_inv n (a : Tm (S n)) b :
     rtc RPar.R (Abs a) b -> exists a', b = Abs a' /\ rtc RPar.R a a'.
   Proof.
@@ -241,6 +243,7 @@ Module RPars.
     - hauto lq:on ctrs:rtc.
     - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
   Qed.
+
 End RPars.
 
 Lemma Abs_EPar n a (b : Tm n) :
@@ -266,23 +269,47 @@ Proof.
       by apply RPar.refl.
       move :ih1; substify; by asimpl.
     + repeat split => //.
-      * apply : rtc_l. apply : RPar.Proj1Abs. apply RPar.refl.
-        apply : RPars.AbsCong.
-
-(*   - move => n a0 a1 ha iha a ? c. subst. *)
-(*     specialize iha with (1 := eq_refl) (c := c). *)
-(*     move : iha => [d [ih0 ih1]]. *)
-(*     exists (Pair (Proj1 d) (Proj2 d)). split => //. *)
-(*     + move { ih1}. *)
-(*       hauto lq:on ctrs:EPar.R. *)
-(*     + apply : rtc_l. *)
-(*       apply RPar.AppPair. *)
-(*       admit. *)
-(*       admit. *)
-(*       apply RPar.refl. *)
-(*       admit. *)
-(*   - admit. *)
-Admitted.
+      * apply : rtc_l.
+        apply : RPar.Proj1Abs.
+        by apply RPar.refl.
+        eauto using RPars.Proj1Cong, RPars.AbsCong.
+      * apply : rtc_l.
+        apply : RPar.Proj2Abs.
+        by apply RPar.refl.
+        eauto using RPars.Proj2Cong, RPars.AbsCong.
+  - move => n ? a1 ha iha a0 ?. subst. specialize iha with (1 := eq_refl).
+    move : iha => [_ [d [ih0 [ih1 ih2]]]].
+    split.
+    + apply RPars.weakening in ih1, ih2.
+      exists (Pair (Proj1 d) (Proj2 d)).
+      split; first by by by apply EPar.PairEta.
+      apply : rtc_l.
+      apply RPar.AppPair; eauto using RPar.refl.
+      suff : rtc RPar.R (App (Proj1 (ren_Tm shift a1)) (VarTm var_zero)) (Proj1 d) /\
+               rtc RPar.R (App (Proj2 (ren_Tm shift a1)) (VarTm var_zero)) (Proj2 d)
+        by firstorder using RPars.PairCong.
+      split.
+      * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj1 d))) (VarTm var_zero)).
+        by apply RPars.AppCong.
+        apply relations.rtc_once => /=.
+        apply : RPar.AppAbs'; eauto using RPar.refl.
+        by asimpl.
+      * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj2 d))) (VarTm var_zero)).
+        by apply RPars.AppCong.
+        apply relations.rtc_once => /=.
+        apply : RPar.AppAbs'; eauto using RPar.refl.
+        by asimpl.
+    + exists d. repeat split => //.
+      apply : rtc_l;eauto. apply RPar.Proj1Pair. eauto using RPar.refl.
+      apply : rtc_l;eauto. apply RPar.Proj2Pair. eauto using RPar.refl.
+  - move => n a0 a1 ha _ ? [*]. subst.
+    split.
+    + exists a1. split => //.
+      apply rtc_once. apply : RPar.AppAbs'; eauto using RPar.refl. by asimpl.
+    + exists a1. repeat split => //=.
+      apply rtc_once. apply : RPar.Proj1Abs; eauto using RPar.refl.
+      apply rtc_once. apply : RPar.Proj2Abs; eauto using RPar.refl.
+Qed.
 
 
 Lemma commutativity n (a b0 b1 : Tm n) :
