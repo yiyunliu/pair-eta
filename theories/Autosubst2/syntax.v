@@ -5,13 +5,26 @@ Require Import Setoid Morphisms Relation_Definitions.
 
 Module Core.
 
+Inductive PTag : Type :=
+  | PL : PTag
+  | PR : PTag.
+
+Lemma congr_PL : PL = PL.
+Proof.
+exact (eq_refl).
+Qed.
+
+Lemma congr_PR : PR = PR.
+Proof.
+exact (eq_refl).
+Qed.
+
 Inductive Tm (n_Tm : nat) : Type :=
   | VarTm : fin n_Tm -> Tm n_Tm
   | Abs : Tm (S n_Tm) -> Tm n_Tm
   | App : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Pair : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
-  | Proj1 : Tm n_Tm -> Tm n_Tm
-  | Proj2 : Tm n_Tm -> Tm n_Tm.
+  | Proj : PTag -> Tm n_Tm -> Tm n_Tm.
 
 Lemma congr_Abs {m_Tm : nat} {s0 : Tm (S m_Tm)} {t0 : Tm (S m_Tm)}
   (H0 : s0 = t0) : Abs m_Tm s0 = Abs m_Tm t0.
@@ -35,16 +48,12 @@ exact (eq_trans (eq_trans eq_refl (ap (fun x => Pair m_Tm x s1) H0))
          (ap (fun x => Pair m_Tm t0 x) H1)).
 Qed.
 
-Lemma congr_Proj1 {m_Tm : nat} {s0 : Tm m_Tm} {t0 : Tm m_Tm} (H0 : s0 = t0) :
-  Proj1 m_Tm s0 = Proj1 m_Tm t0.
+Lemma congr_Proj {m_Tm : nat} {s0 : PTag} {s1 : Tm m_Tm} {t0 : PTag}
+  {t1 : Tm m_Tm} (H0 : s0 = t0) (H1 : s1 = t1) :
+  Proj m_Tm s0 s1 = Proj m_Tm t0 t1.
 Proof.
-exact (eq_trans eq_refl (ap (fun x => Proj1 m_Tm x) H0)).
-Qed.
-
-Lemma congr_Proj2 {m_Tm : nat} {s0 : Tm m_Tm} {t0 : Tm m_Tm} (H0 : s0 = t0) :
-  Proj2 m_Tm s0 = Proj2 m_Tm t0.
-Proof.
-exact (eq_trans eq_refl (ap (fun x => Proj2 m_Tm x) H0)).
+exact (eq_trans (eq_trans eq_refl (ap (fun x => Proj m_Tm x s1) H0))
+         (ap (fun x => Proj m_Tm t0 x) H1)).
 Qed.
 
 Lemma upRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n) :
@@ -66,8 +75,7 @@ Fixpoint ren_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
   | Abs _ s0 => Abs n_Tm (ren_Tm (upRen_Tm_Tm xi_Tm) s0)
   | App _ s0 s1 => App n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1)
   | Pair _ s0 s1 => Pair n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1)
-  | Proj1 _ s0 => Proj1 n_Tm (ren_Tm xi_Tm s0)
-  | Proj2 _ s0 => Proj2 n_Tm (ren_Tm xi_Tm s0)
+  | Proj _ s0 s1 => Proj n_Tm s0 (ren_Tm xi_Tm s1)
   end.
 
 Lemma up_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm) :
@@ -90,8 +98,7 @@ Fixpoint subst_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
   | Abs _ s0 => Abs n_Tm (subst_Tm (up_Tm_Tm sigma_Tm) s0)
   | App _ s0 s1 => App n_Tm (subst_Tm sigma_Tm s0) (subst_Tm sigma_Tm s1)
   | Pair _ s0 s1 => Pair n_Tm (subst_Tm sigma_Tm s0) (subst_Tm sigma_Tm s1)
-  | Proj1 _ s0 => Proj1 n_Tm (subst_Tm sigma_Tm s0)
-  | Proj2 _ s0 => Proj2 n_Tm (subst_Tm sigma_Tm s0)
+  | Proj _ s0 s1 => Proj n_Tm s0 (subst_Tm sigma_Tm s1)
   end.
 
 Lemma upId_Tm_Tm {m_Tm : nat} (sigma : fin m_Tm -> Tm m_Tm)
@@ -126,8 +133,7 @@ subst_Tm sigma_Tm s = s :=
   | Pair _ s0 s1 =>
       congr_Pair (idSubst_Tm sigma_Tm Eq_Tm s0)
         (idSubst_Tm sigma_Tm Eq_Tm s1)
-  | Proj1 _ s0 => congr_Proj1 (idSubst_Tm sigma_Tm Eq_Tm s0)
-  | Proj2 _ s0 => congr_Proj2 (idSubst_Tm sigma_Tm Eq_Tm s0)
+  | Proj _ s0 s1 => congr_Proj (eq_refl s0) (idSubst_Tm sigma_Tm Eq_Tm s1)
   end.
 
 Lemma upExtRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n)
@@ -164,8 +170,8 @@ Fixpoint extRen_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
   | Pair _ s0 s1 =>
       congr_Pair (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
         (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1)
-  | Proj1 _ s0 => congr_Proj1 (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
-  | Proj2 _ s0 => congr_Proj2 (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0) (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1)
   end.
 
 Lemma upExt_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm)
@@ -204,8 +210,7 @@ Fixpoint ext_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
   | Pair _ s0 s1 =>
       congr_Pair (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
         (ext_Tm sigma_Tm tau_Tm Eq_Tm s1)
-  | Proj1 _ s0 => congr_Proj1 (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
-  | Proj2 _ s0 => congr_Proj2 (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
+  | Proj _ s0 s1 => congr_Proj (eq_refl s0) (ext_Tm sigma_Tm tau_Tm Eq_Tm s1)
   end.
 
 Lemma up_ren_ren_Tm_Tm {k : nat} {l : nat} {m : nat} (xi : fin k -> fin l)
@@ -243,8 +248,8 @@ Fixpoint compRenRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
   | Pair _ s0 s1 =>
       congr_Pair (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
         (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
-  | Proj1 _ s0 => congr_Proj1 (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
-  | Proj2 _ s0 => congr_Proj2 (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0) (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
   end.
 
 Lemma up_ren_subst_Tm_Tm {k : nat} {l : nat} {m_Tm : nat}
@@ -291,10 +296,9 @@ Fixpoint compRenSubst_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
   | Pair _ s0 s1 =>
       congr_Pair (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
         (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s1)
-  | Proj1 _ s0 =>
-      congr_Proj1 (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
-  | Proj2 _ s0 =>
-      congr_Proj2 (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0)
+        (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s1)
   end.
 
 Lemma up_subst_ren_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -362,10 +366,9 @@ ren_Tm zeta_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
   | Pair _ s0 s1 =>
       congr_Pair (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
         (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s1)
-  | Proj1 _ s0 =>
-      congr_Proj1 (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
-  | Proj2 _ s0 =>
-      congr_Proj2 (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0)
+        (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s1)
   end.
 
 Lemma up_subst_subst_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -434,10 +437,9 @@ subst_Tm tau_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
   | Pair _ s0 s1 =>
       congr_Pair (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
         (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s1)
-  | Proj1 _ s0 =>
-      congr_Proj1 (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
-  | Proj2 _ s0 =>
-      congr_Proj2 (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0)
+        (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s1)
   end.
 
 Lemma renRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
@@ -546,8 +548,8 @@ Fixpoint rinst_inst_Tm {m_Tm : nat} {n_Tm : nat}
   | Pair _ s0 s1 =>
       congr_Pair (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
         (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
-  | Proj1 _ s0 => congr_Proj1 (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
-  | Proj2 _ s0 => congr_Proj2 (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
+  | Proj _ s0 s1 =>
+      congr_Proj (eq_refl s0) (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
   end.
 
 Lemma rinstInst'_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
@@ -746,9 +748,7 @@ Core.
 
 Arguments VarTm {n_Tm}.
 
-Arguments Proj2 {n_Tm}.
-
-Arguments Proj1 {n_Tm}.
+Arguments Proj {n_Tm}.
 
 Arguments Pair {n_Tm}.
 

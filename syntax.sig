@@ -1,8 +1,9 @@
 Tm(VarTm) : Type
--- nat : Type
+PTag : Type
 
+PL : PTag
+PR : PTag
 Abs : (bind Tm in Tm) -> Tm
 App : Tm -> Tm -> Tm
 Pair : Tm -> Tm -> Tm
-Proj1 : Tm -> Tm
-Proj2 : Tm -> Tm
+Proj : PTag -> Tm -> Tm

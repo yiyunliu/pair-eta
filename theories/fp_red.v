@@ -17,18 +17,13 @@ Module Par.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | Proj1Abs a0 a1 :
+  | ProjAbs p a0 a1 :
     R a0 a1 ->
-    R (Proj1 (Abs a0)) (Abs (Proj1 a0))
-  | Proj1Pair a0 a1 b :
+    R (Proj p (Abs a0)) (Abs (Proj p a1))
+  | ProjPair p a0 a1 b0 b1 :
     R a0 a1 ->
-    R (Proj1 (Pair a0 b)) a1
-  | Proj2Abs a0 a1 :
-    R a0 a1 ->
-    R (Proj2 (Abs a0)) (Abs (Proj2 a0))
-  | Proj2Pair a0 a1 b :
-    R a0 a1 ->
-    R (Proj2 (Pair b a0)) a1
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
 
   (****************** Eta ***********************)
   | AppEta a0 a1 :
@@ -36,7 +31,7 @@ Module Par.
     R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
-    R a0 (Pair (Proj1 a1) (Proj2 a1))
+    R a0 (Pair (Proj PL a1) (Proj PR a1))
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -51,12 +46,9 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R (Pair a0 b0) (Pair a1 b1)
-  | Proj1Cong a0 a1 :
+  | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj1 a0) (Proj1 a1)
-  | Proj2Cong a0 a1 :
-    R a0 a1 ->
-    R (Proj2 a0) (Proj2 a1).
+    R (Proj p a0) (Proj p a1).
 End Par.
 
 (***************** Beta rules only ***********************)
@@ -72,18 +64,14 @@ Module RPar.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | Proj1Abs a0 a1 :
+  | ProjAbs p a0 a1 :
     R a0 a1 ->
-    R (Proj1 (Abs a0)) (Abs (Proj1 a1))
-  | Proj1Pair a0 a1 b :
+    R (Proj p (Abs a0)) (Abs (Proj p a1))
+  | ProjPair p a0 a1 b0 b1 :
     R a0 a1 ->
-    R (Proj1 (Pair a0 b)) a1
-  | Proj2Abs a0 a1 :
-    R a0 a1 ->
-    R (Proj2 (Abs a0)) (Abs (Proj2 a1))
-  | Proj2Pair a0 a1 b :
-    R a0 a1 ->
-    R (Proj2 (Pair b a0)) a1
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
+
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -98,12 +86,9 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R (Pair a0 b0) (Pair a1 b1)
-  | Proj1Cong a0 a1 :
+  | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj1 a0) (Proj1 a1)
-  | Proj2Cong a0 a1 :
-    R a0 a1 ->
-    R (Proj2 a0) (Proj2 a1).
+    R (Proj p a0) (Proj p a1).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -119,13 +104,20 @@ Module RPar.
     R (App (Abs a0) b0) t.
   Proof. move => ->. apply AppAbs. Qed.
 
+  Lemma ProjPair' n p (a0 a1 b0 b1 : Tm n) t :
+    t = (if p is PL then a1 else b1) ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) t.
+  Proof.  move => > ->. apply ProjPair. Qed.
+
   Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
     R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
   Proof.
     move => h. move : m ξ.
     elim : n a b /h.
     move => *; apply : AppAbs'; eauto; by asimpl.
-    all : qauto ctrs:R.
+    all : qauto ctrs:R use:ProjPair'.
   Qed.
 
   Lemma morphing_ren n m p (ρ0 ρ1 : fin n -> Tm m) (ξ : fin m -> fin p) :
@@ -155,13 +147,10 @@ Module RPar.
       by asimpl.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:ProjPair' use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
-    - qauto.
-    - hauto lq:on ctrs:R use:morphing_up.
-    - hauto lq:on ctrs:R.
-    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
   Qed.
@@ -180,7 +169,7 @@ Module EPar.
     R a0 (Abs (App (ren_Tm shift a1) (VarTm var_zero)))
   | PairEta a0 a1 :
     R a0 a1 ->
-    R a0 (Pair (Proj1 a1) (Proj2 a1))
+    R a0 (Pair (Proj PL a1) (Proj PR a1))
 
   (*************** Congruence ********************)
   | Var i : R (VarTm i) (VarTm i)
@@ -195,12 +184,9 @@ Module EPar.
     R a0 a1 ->
     R b0 b1 ->
     R (Pair a0 b0) (Pair a1 b1)
-  | Proj1Cong a0 a1 :
+  | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj1 a0) (Proj1 a1)
-  | Proj2Cong a0 a1 :
-    R a0 a1 ->
-    R (Proj2 a0) (Proj2 a1).
+    R (Proj p a0) (Proj p a1).
 
   Lemma refl n (a : Tm n) : EPar.R a a.
   Proof.
@@ -239,7 +225,6 @@ Module EPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto l:on ctrs:R use:renaming inv:option.
-    - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
@@ -287,14 +272,9 @@ Module RPars.
     rtc RPar.R (Pair a0 b0) (Pair a1 b1).
   Proof. solve_s. Qed.
 
-  Lemma Proj1Cong n (a0 a1  : Tm n) :
+  Lemma ProjCong n p (a0 a1  : Tm n) :
     rtc RPar.R a0 a1 ->
-    rtc RPar.R (Proj1 a0) (Proj1 a1).
-  Proof. solve_s. Qed.
-
-  Lemma Proj2Cong n (a0 a1  : Tm n) :
-    rtc RPar.R a0 a1 ->
-    rtc RPar.R (Proj2 a0) (Proj2 a1).
+    rtc RPar.R (Proj p a0) (Proj p a1).
   Proof. solve_s. Qed.
 
   Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
@@ -337,9 +317,8 @@ Lemma Abs_EPar n a (b : Tm n) :
   (exists d, EPar.R a d /\
      rtc RPar.R (App (ren_Tm shift b) (VarTm var_zero)) d) /\
          (exists d,
-         EPar.R a d /\
-         rtc RPar.R (Proj1 b) (Abs (Proj1 d)) /\
-         rtc RPar.R (Proj2 b) (Abs (Proj2 d))).
+         EPar.R a d /\ forall p,
+         rtc RPar.R (Proj p b) (Abs (Proj p d))).
 Proof.
   move E : (Abs a) => u h.
   move : a E.
@@ -354,47 +333,35 @@ Proof.
       apply RPar.refl.
       by apply RPar.refl.
       move :ih1; substify; by asimpl.
-    + repeat split => //.
-      * apply : rtc_l.
-        apply : RPar.Proj1Abs.
-        by apply RPar.refl.
-        eauto using RPars.Proj1Cong, RPars.AbsCong.
-      * apply : rtc_l.
-        apply : RPar.Proj2Abs.
-        by apply RPar.refl.
-        eauto using RPars.Proj2Cong, RPars.AbsCong.
+    + split => // p.
+      apply : rtc_l.
+      apply : RPar.ProjAbs.
+      by apply RPar.refl.
+      eauto using RPars.ProjCong, RPars.AbsCong.
   - move => n ? a1 ha iha a0 ?. subst. specialize iha with (1 := eq_refl).
-    move : iha => [_ [d [ih0 [ih1 ih2]]]].
+    move : iha => [_ [d [ih0 ih1]]].
     split.
-    + apply RPars.weakening in ih1, ih2.
-      exists (Pair (Proj1 d) (Proj2 d)).
-      split; first by by by apply EPar.PairEta.
+    + exists (Pair (Proj PL d) (Proj PR d)).
+      split; first by apply EPar.PairEta.
       apply : rtc_l.
       apply RPar.AppPair; eauto using RPar.refl.
-      suff : rtc RPar.R (App (Proj1 (ren_Tm shift a1)) (VarTm var_zero)) (Proj1 d) /\
-               rtc RPar.R (App (Proj2 (ren_Tm shift a1)) (VarTm var_zero)) (Proj2 d)
-        by firstorder using RPars.PairCong.
-      split.
-      * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj1 d))) (VarTm var_zero)).
-        by eauto using RPars.AppCong, rtc_refl.
-        apply relations.rtc_once => /=.
-        apply : RPar.AppAbs'; eauto using RPar.refl.
-        by asimpl.
-      * apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj2 d))) (VarTm var_zero)).
-        by eauto using RPars.AppCong, rtc_refl.
-        apply relations.rtc_once => /=.
-        apply : RPar.AppAbs'; eauto using RPar.refl.
-        by asimpl.
-    + exists d. repeat split => //.
-      apply : rtc_l;eauto. apply RPar.Proj1Pair. eauto using RPar.refl.
-      apply : rtc_l;eauto. apply RPar.Proj2Pair. eauto using RPar.refl.
+      suff h : forall p, rtc RPar.R (App (Proj p (ren_Tm shift a1)) (VarTm var_zero)) (Proj p d) by
+          sfirstorder use:RPars.PairCong.
+      move => p. move /(_ p) /RPars.weakening in ih1.
+      apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj p d))) (VarTm var_zero)).
+      by eauto using RPars.AppCong, rtc_refl.
+      apply relations.rtc_once => /=.
+      apply : RPar.AppAbs'; eauto using RPar.refl.
+      by asimpl.
+    + exists d. repeat split => //. move => p.
+      apply : rtc_l; eauto.
+      hauto q:on use:RPar.ProjPair', RPar.refl.
   - move => n a0 a1 ha _ ? [*]. subst.
     split.
     + exists a1. split => //.
       apply rtc_once. apply : RPar.AppAbs'; eauto using RPar.refl. by asimpl.
-    + exists a1. repeat split => //=.
-      apply rtc_once. apply : RPar.Proj1Abs; eauto using RPar.refl.
-      apply rtc_once. apply : RPar.Proj2Abs; eauto using RPar.refl.
+    + exists a1. split => // p.
+      apply rtc_once. apply : RPar.ProjAbs; eauto using RPar.refl.
 Qed.
 
 Lemma commutativity n (a b0 b1 : Tm n) :
@@ -411,10 +378,9 @@ Proof.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
-    exists (Pair (Proj1 c) (Proj2 c)). split.
-    + apply RPars.PairCong.
-      by apply RPars.Proj1Cong.
-      by apply RPars.Proj2Cong.
+    exists (Pair (Proj PL c) (Proj PR c)). split.
+    + apply RPars.PairCong;
+      by apply RPars.ProjCong.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - hauto l:on ctrs:rtc inv:RPar.R.
   - move => n a0 a1 h ih b1.
@@ -440,20 +406,17 @@ Proof.
       admit.
     + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
   - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
-  - move => n a b0 h0 ih0 b1.
+  - move => n p a b0 h0 ih0 b1.
     elim /RPar.inv => //= _.
-    + move => a0 a1 h [*]. subst.
+    + move => ? a0 a1 h [*]. subst.
+      move /(_ _ ltac:(by eauto using RPar.AbsCong)) : ih0 => [c [ih0 ih1]].
+      move /Abs_EPar : ih1 => [_ [d [ih1 ih2]]].
+      exists (Abs (Proj p d)).
+      qauto l:on ctrs:EPar.R use:RPars.ProjCong, @relations.rtc_transitive.
+    + move => p0 a0 a1 b2 b3 h1 h2 [*]. subst.
+      move /(_ _ ltac:(by eauto using RPar.PairCong)) : ih0 => [c [ih0 ih1]].
       admit.
-    + move => a0 ? a1 h1 [*]. subst.
-      admit.
-    + hauto lq:on ctrs:RPar.R, EPar.R.
-  - move => n a b0 h0 ih0 b1.
-    elim /RPar.inv => //= _.
-    + move => a0 a1 ha [*]. subst.
-      admit.
-    + move => a0 a1 b2 h [*]. subst.
-      admit.
-    + hauto lq:on ctrs:RPar.R, EPar.R.
+    + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
 Admitted.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
