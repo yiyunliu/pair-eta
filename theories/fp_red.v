@@ -74,13 +74,13 @@ Module RPar.
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
   | Proj1Abs a0 a1 :
     R a0 a1 ->
-    R (Proj1 (Abs a0)) (Abs (Proj1 a0))
+    R (Proj1 (Abs a0)) (Abs (Proj1 a1))
   | Proj1Pair a0 a1 b :
     R a0 a1 ->
     R (Proj1 (Pair a0 b)) a1
   | Proj2Abs a0 a1 :
     R a0 a1 ->
-    R (Proj2 (Abs a0)) (Abs (Proj2 a0))
+    R (Proj2 (Abs a0)) (Abs (Proj2 a1))
   | Proj2Pair a0 a1 b :
     R a0 a1 ->
     R (Proj2 (Pair b a0)) a1
@@ -128,13 +128,48 @@ Module RPar.
     all : qauto ctrs:R.
   Qed.
 
+  Lemma morphing_ren n m p (ρ0 ρ1 : fin n -> Tm m) (ξ : fin m -> fin p) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R ((funcomp (ren_Tm ξ) ρ0) i) ((funcomp (ren_Tm ξ) ρ1) i)).
+  Proof. eauto using renaming. Qed.
+
+  Lemma morphing_ext n m (ρ0 ρ1 : fin n -> Tm m) a b  :
+    R a b ->
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R ((scons a ρ0) i) ((scons b ρ1) i)).
+  Proof. hauto q:on inv:option. Qed.
+
+  Lemma morphing_up n m (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R (up_Tm_Tm ρ0 i) (up_Tm_Tm ρ1 i)).
+  Proof. hauto l:on ctrs:R use:morphing_ext, morphing_ren unfold:up_Tm_Tm. Qed.
+
   Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
     R a b -> R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
   Proof.
-    move => h. move : m ρ0 ρ1.
+    move => + h. move : m ρ0 ρ1.
     elim : n a b /h.
-    Admitted.
+    - move => *.
+      apply : AppAbs'; eauto using morphing_up.
+      by asimpl.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - qauto.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+  Qed.
 
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    R a b ->
+    R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. hauto l:on use:morphing, refl. Qed.
 End RPar.
 
 Module EPar.
@@ -285,6 +320,16 @@ Module RPars.
     - hauto lq:on ctrs:rtc inv:RPar.R, rtc.
   Qed.
 
+  Lemma morphing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    rtc RPar.R a b ->
+    rtc RPar.R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. induction 1; qauto l:on ctrs:rtc use:RPar.substing. Qed.
+
+  Lemma substing n (a b : Tm (S n)) c :
+    rtc RPar.R a b ->
+    rtc RPar.R (subst_Tm (scons c VarTm) a) (subst_Tm (scons c VarTm) b).
+  Proof. hauto lq:on use:morphing inv:option. Qed.
+
 End RPars.
 
 Lemma Abs_EPar n a (b : Tm n) :
@@ -385,7 +430,10 @@ Proof.
       exists (subst_Tm (scons b VarTm) d).
       split.
       (* By substitution *)
-      * admit.
+      * move /RPars.substing  : ih2.
+        move /(_ b).
+        asimpl.
+        eauto using relations.rtc_transitive, RPars.AppCong.
       (* By EPar morphing *)
       * by apply EPar.substing.
     + move => a2 a3 b3 b4 c0 c1 h0 h1 h2 [*]. subst.
