@@ -393,8 +393,29 @@ Proof.
   - move => n a0 a1 ha iha a b ?. subst. specialize iha with (1 := eq_refl).
     split => [p|].
     + move : iha => [/(_ p) [d [ih0 ih1]] _].
-
-
+      exists d. split=>//.
+      apply : rtc_l. apply RPar.ProjPair; eauto using RPar.refl.
+      set q := (X in rtc RPar.R X d).
+      by have -> : q = Proj p a1 by hauto lq:on.
+    + move  :iha => [iha _].
+      move : (iha PL) => [d0 [ih0 ih0']].
+      move : (iha PR) => [d1 [ih1 ih1']] {iha}.
+      exists d0, d1.
+      apply RPars.weakening in ih0, ih1.
+      repeat split => //=.
+      apply : rtc_l. apply RPar.AppPair; eauto using RPar.refl.
+      apply RPars.PairCong; apply RPars.AppCong; eauto using rtc_refl.
+  - move => n a0 a1 b0 b1 ha _ hb _ a b [*]. subst.
+    split.
+    + move => p.
+      exists (if p is PL then a1 else b1).
+      split.
+      * apply rtc_once. apply : RPar.ProjPair'; eauto using RPar.refl.
+      * hauto lq:on rew:off.
+    + exists a1, b1.
+      split. apply rtc_once. apply RPar.AppPair; eauto using RPar.refl.
+      split => //.
+Qed.
 
 Lemma commutativity n (a b0 b1 : Tm n) :
   EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
