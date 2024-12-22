@@ -364,6 +364,16 @@ Proof.
       apply rtc_once. apply : RPar.ProjAbs; eauto using RPar.refl.
 Qed.
 
+Lemma Pair_EPar n (a b c : Tm n) :
+  EPar.R (Pair a b) c ->
+  (forall p, exists d, rtc RPar.R (Proj p c) d /\ EPar.R (if p is PL then a else b) d) /\
+    (exists d0 d1, rtc RPar.R (App (ren_Tm shift c) (VarTm var_zero))
+                (Pair (App (ren_Tm shift d0) (VarTm var_zero))(App (ren_Tm shift d1) (VarTm var_zero))) /\
+    EPar.R a d0 /\ EPar.R b d1).
+Proof.
+Admitted.
+
+
 Lemma commutativity n (a b0 b1 : Tm n) :
   EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
 Proof.
