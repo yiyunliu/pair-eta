@@ -501,6 +501,21 @@ Lemma commutativity n (a b0 b1 : Tm n) :
     hauto q:on ctrs:rtc.
 Qed.
 
+Lemma EPar_diamond n (c a1 b1 : Tm n) :
+  EPar.R c a1 ->
+  EPar.R c b1 ->
+  exists d2, EPar.R a1 d2 /\ EPar.R b1 d2.
+Proof.
+  move => h. move : b1. elim : n c a1 / h.
+  - move => n c a1 ha iha b1 /iha [d2 [hd0 hd1]].
+    exists(Abs (App (ren_Tm shift d2) (VarTm var_zero))).
+    hauto lq:on ctrs:EPar.R use:EPar.renaming.
+  - hauto lq:on rew:off ctrs:EPar.R.
+  - hauto lq:on use:EPar.refl.
+  - move => n a0 a1 ha iha a2 ha2.
+
+
+
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
