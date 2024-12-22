@@ -456,7 +456,16 @@ Proof.
       (* By EPar morphing *)
       * by apply EPar.substing.
     + move => a2 a3 b3 b4 c0 c1 h0 h1 h2 [*]. subst.
-      admit.
+      move /(_ _ ltac:(by eauto using RPar.PairCong)) : iha
+           => [c [ihc0 ihc1]].
+      move /(_ _ ltac:(by eauto)) : ihb => [d [ihd0 ihd1]].
+      move /Pair_EPar  : ihc1 => [_ [d0 [d1 [ih0 [ih1 ih2]]]]].
+      move /RPars.substing : ih0. move /(_ d).
+      asimpl => h.
+      exists (Pair (App d0 d) (App d1 d)).
+      split.
+      hauto lq:on use:relations.rtc_transitive, RPars.AppCong.
+      apply EPar.PairCong; by apply EPar.AppCong.
     + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
   - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
   - move => n p a b0 h0 ih0 b1.
@@ -468,9 +477,11 @@ Proof.
       qauto l:on ctrs:EPar.R use:RPars.ProjCong, @relations.rtc_transitive.
     + move => p0 a0 a1 b2 b3 h1 h2 [*]. subst.
       move /(_ _ ltac:(by eauto using RPar.PairCong)) : ih0 => [c [ih0 ih1]].
-      admit.
+      move /Pair_EPar : ih1 => [/(_ p)[d [ihd ihd']] _].
+      exists d. split => //.
+      hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
-Admitted.
+Qed.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
