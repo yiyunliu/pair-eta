@@ -371,7 +371,29 @@ Lemma Pair_EPar n (a b c : Tm n) :
                 (Pair (App (ren_Tm shift d0) (VarTm var_zero))(App (ren_Tm shift d1) (VarTm var_zero))) /\
     EPar.R a d0 /\ EPar.R b d1).
 Proof.
-Admitted.
+  move E : (Pair a b) => u h. move : a b E.
+  elim : n u c /h => //=.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    move : iha => [_ [d0 [d1 [ih0 [ih1 ih2]]]]].
+    split.
+    + move => p.
+      exists (Abs (App (ren_Tm shift (if p is PL then d0 else d1)) (VarTm var_zero))).
+      split.
+      * apply : relations.rtc_transitive.
+        ** apply RPars.ProjCong. apply RPars.AbsCong. eassumption.
+        ** apply : rtc_l. apply RPar.ProjAbs; eauto using RPar.refl. apply RPars.AbsCong.
+           apply : rtc_l. apply RPar.ProjPair; eauto using RPar.refl.
+           hauto l:on.
+      * hauto lq:on use:EPar.AppEta'.
+    + exists d0, d1.
+      repeat split => //.
+      apply : rtc_l. apply : RPar.AppAbs'; eauto using RPar.refl => //=.
+      by asimpl; renamify.
+  - move => n a0 a1 ha iha a b ?. subst. specialize iha with (1 := eq_refl).
+    split => [p|].
+    + move : iha => [/(_ p) [d [ih0 ih1]] _].
+
 
 
 Lemma commutativity n (a b0 b1 : Tm n) :
