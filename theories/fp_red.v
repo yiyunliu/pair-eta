@@ -417,7 +417,7 @@ Proof.
       split => //.
 Qed.
 
-Lemma commutativity n (a b0 b1 : Tm n) :
+Lemma commutativity0 n (a b0 b1 : Tm n) :
   EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
 Proof.
   move => h. move : b1.
@@ -482,6 +482,25 @@ Proof.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
 Qed.
+
+Lemma commutativity1 n (a b0 b1 : Tm n) :
+  EPar.R a b0 -> rtc RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
+Proof.
+  move => + h. move : b0.
+  elim : a b1 / h.
+  - sfirstorder.
+  - qauto l:on use:relations.rtc_transitive, commutativity0.
+Qed.
+
+Lemma commutativity n (a b0 b1 : Tm n) :
+  rtc EPar.R a b0 -> rtc RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ rtc EPar.R b1 c.
+  move => h. move : b1. elim : a b0 /h.
+  - sfirstorder.
+  - move => a0 a1 a2 + ha1 ih b1 +.
+    move : commutativity1; repeat move/[apply].
+    hauto q:on ctrs:rtc.
+Qed.
+
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
