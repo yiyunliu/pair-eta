@@ -242,6 +242,45 @@ Module EPar.
 End EPar.
 
 
+Module OExp.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (****************** Eta ***********************)
+  | AppEta a :
+    R a (Abs (App (ren_Tm shift a) (VarTm var_zero)))
+  | PairEta a :
+    R a (Pair (Proj PL a) (Proj PR a)).
+
+  Lemma merge n (t a b : Tm n) :
+    rtc R a b ->
+    EPar.R t a ->
+    EPar.R t b.
+  Proof.
+    move => h. move : t. elim : a b /h.
+    - eauto using EPar.refl.
+    - hauto q:on ctrs:EPar.R inv:R.
+  Qed.
+
+  Lemma commutativity n (a b c : Tm n) :
+    EPar.R a b -> R a c -> exists d, R b d /\ EPar.R c d.
+  Proof.
+    move => h.
+    inversion 1; subst.
+    - hauto q:on ctrs:EPar.R, R use:EPar.renaming, EPar.refl.
+    - hauto lq:on ctrs:EPar.R, R.
+  Qed.
+
+  Lemma commutativity0 n (a b c : Tm n) :
+    EPar.R a b -> rtc R a c -> exists d, rtc R b d /\ EPar.R c d.
+  Proof.
+    move => + h. move : b.
+    elim : a c / h.
+    - sfirstorder.
+    - hauto lq:on rew:off ctrs:rtc use:commutativity.
+  Qed.
+
+End OExp.
+
+
 Local Ltac com_helper :=
   split; [hauto lq:on ctrs:RPar.R use: RPar.refl, RPar.renaming
          |hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming].
