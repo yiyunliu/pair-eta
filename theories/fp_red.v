@@ -1,4 +1,5 @@
 Require Import ssreflect.
+Require Import FunInd.
 From stdpp Require Import relations (rtc (..), rtc_once, rtc_r).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
@@ -159,6 +160,15 @@ Module RPar.
     R a b ->
     R (subst_Tm ρ a) (subst_Tm ρ b).
   Proof. hauto l:on use:morphing, refl. Qed.
+
+  Lemma cong n (a b : Tm (S n)) c d :
+    R a b ->
+    R c d ->
+    R (subst_Tm (scons c VarTm) a) (subst_Tm (scons d VarTm) b).
+  Proof.
+    move => h0 h1. apply morphing => //=.
+    qauto l:on ctrs:R inv:option.
+  Qed.
 End RPar.
 
 Module EPar.
@@ -646,33 +656,37 @@ Proof.
     exists d1. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
 Qed.
 
+Function tstar {n} (a : Tm n) :=
+  match a with
+  | VarTm i => a
+  | Abs a => Abs (tstar a)
+  | App (Abs a) b => subst_Tm (scons (tstar b) VarTm) (tstar a)
+  | App (Pair a b) c =>
+      Pair (App (tstar a) (tstar c)) (App (tstar b) (tstar c))
+  | App a b => App (tstar a) (tstar b)
+  | Pair a b => Pair (tstar a) (tstar b)
+  | Proj p (Pair a b) => if p is PL then (tstar a) else (tstar b)
+  | Proj p (Abs a) => (Abs (Proj p (tstar a)))
+  | Proj p a => Proj p (tstar a)
+  end.
 
-
-
-
-Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
-Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
-
-Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
-Proof. induction 1; hauto lq:on ctrs:Par.R. Qed.
-
-Lemma merge n (t a u : Tm n) :
-  EPar.R t a ->
-  RPar.R a u ->
-  Par.R t u.
+Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
 Proof.
-  move => h. move : u.
-  elim:t a/h.
-  - move => n0 a0 a1 ha iha u hu.
-    apply iha.
-    inversion hu; subst.
+  apply tstar_ind => {n a}.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
+  - hauto lq:on use:RPar.cong, RPar.refl ctrs:RPar.R inv:RPar.R.
+  - hauto lq:on rew:off ctrs:RPar.R inv:RPar.R.
+  - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
+  - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
+  - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+  - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
+Qed.
 
-
-  - hauto lq:on inv:RPar.R.
-  - move => a0 a1 b0 b1 ha iha hb ihb u.
-    inversion 1; subst.
-    + inversion ha.
-
-best use:EPar_Par, RPar_Par.
-
-  best ctrs:Par.R inv:EPar.R,RPar.R use:EPar_Par, RPar_Par.
+Lemma RPar_diamond n (c a1 b1 : Tm n) :
+  RPar.R c a1 ->
+  RPar.R c b1 ->
+  exists d2, RPar.R a1 d2 /\ RPar.R b1 d2.
+Proof. hauto l:on use:RPar_triangle. Qed.
