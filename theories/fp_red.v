@@ -3,6 +3,7 @@ Require Import FunInd.
 From stdpp Require Import relations (rtc (..), rtc_once, rtc_r).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
+From Equations Require Import Equations.
 
 
 (* Trying my best to not write C style module_funcname *)
@@ -53,7 +54,9 @@ Module Par.
   | PiCong A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1).
+    R (Pi A0 B0) (Pi A1 B1)
+  | BotCong :
+    R Bot Bot.
 End Par.
 
 (***************** Beta rules only ***********************)
@@ -97,7 +100,9 @@ Module RPar.
   | PiCong A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1).
+    R (Pi A0 B0) (Pi A1 B1)
+  | BotCong :
+    R Bot Bot.
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -163,6 +168,7 @@ Module RPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
   Qed.
 
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
@@ -209,7 +215,9 @@ Module EPar.
   | PiCong A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1).
+    R (Pi A0 B0) (Pi A1 B1)
+  | BotCong :
+    R Bot Bot.
 
   Lemma refl n (a : Tm n) : EPar.R a a.
   Proof.
@@ -252,6 +260,7 @@ Module EPar.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
     - hauto l:on ctrs:R use:renaming inv:option.
+    - hauto lq:on ctrs:R.
   Qed.
 
   Lemma substing n a0 a1 (b0 b1 : Tm n) :
@@ -551,6 +560,7 @@ Proof.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
   - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.PiCong.
+  - hauto l:on ctrs:EPar.R inv:RPar.R.
 Qed.
 
 Lemma commutativity1 n (a b0 b1 : Tm n) :
@@ -650,6 +660,20 @@ Proof.
   - hauto l:on ctrs:OExp.R.
 Qed.
 
+Lemma Bot_EPar' n (u : Tm n) :
+  EPar.R Bot u ->
+  rtc OExp.R Bot u.
+  move E : Bot => t h.
+  move : E. elim : n t u /h => //=.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
 Lemma EPar_diamond n (c a1 b1 : Tm n) :
   EPar.R c a1 ->
   EPar.R c b1 ->
@@ -697,6 +721,7 @@ Proof.
     move : OExp.commutativity0 h2; repeat move/[apply].
     move => [d h].
     exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+  - qauto use:Bot_EPar', EPar.refl.
 Qed.
 
 Function tstar {n} (a : Tm n) :=
@@ -712,6 +737,7 @@ Function tstar {n} (a : Tm n) :=
   | Proj p (Abs a) => (Abs (Proj p (tstar a)))
   | Proj p a => Proj p (tstar a)
   | Pi a b => Pi (tstar a) (tstar b)
+  | Bot => Bot
   end.
 
 Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
@@ -725,6 +751,7 @@ Proof.
   - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
@@ -752,13 +779,52 @@ Proof.
   sfirstorder use:relations.diamond_confluent, EPar_diamond.
 Qed.
 
-Fixpoint prov {n} A B (a : Tm n) : Prop :=
+Fixpoint depth_tm {n} (a : Tm n) :=
   match a with
-  | Pi A0 B0 => rtc Par.R A A0 /\ rtc Par.R B B0
-  | App a b => prov A B a
-  | Abs a => prov A B (subst_Tm (scons A VarTm) a)
-  | _ => True
+  | VarTm _ => 1
+  | Pi A B => 1 + max (depth_tm A) (depth_tm B)
+  | Abs a => 1 + depth_tm a
+  | App a b => 1 + max (depth_tm a) (depth_tm b)
+  | Proj p a => 1 + depth_tm a
+  | Pair a b => 1 + max (depth_tm a) (depth_tm b)
+  | Bot => 1
   end.
+
+Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
+  prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
+  prov A B (Abs a) := prov A B (subst_Tm (scons Bot VarTm) a);
+  prov A B (App a b) := prov A B a;
+  prov A B (Pair a b) := prov A B a /\ prov A B b;
+  prov A B (Proj p a) := prov A B a;
+  prov A B Bot := False;
+  prov A B (VarTm _) := False.
+Next Obligation.
+Admitted.
+
+Next Obligation.
+  sfirstorder.
+Qed.
+
+Next Obligation.
+  sfirstorder.
+Qed.
+
+Next Obligation.
+  sfirstorder.
+Qed.
+
+Lemma prov_par n (A : Tm n) B a b : prov A B a -> EPar.R a b -> prov A B b.
+Proof.
+  move => + h. move : A B.
+  elim : n a b /h.
+  - move => n a0 a1 ha iha A B. simp prov. move /iha.
+    asimpl. simp prov.
+  - hauto l:on rew:db:prov.
+  - simp prov.
+  - move => n a0 a1 ha iha A B. simp prov.
+
+
+
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->

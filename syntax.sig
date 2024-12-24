@@ -8,3 +8,4 @@ App : Tm -> Tm -> Tm
 Pair : Tm -> Tm -> Tm
 Proj : PTag -> Tm -> Tm
 Pi : Tm -> (bind Tm in Tm) -> Tm
+Bot : Tm

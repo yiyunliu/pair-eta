@@ -25,7 +25,8 @@ Inductive Tm (n_Tm : nat) : Type :=
   | App : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Pair : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Proj : PTag -> Tm n_Tm -> Tm n_Tm
-  | Pi : Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm.
+  | Pi : Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm
+  | Bot : Tm n_Tm.
 
 Lemma congr_Abs {m_Tm : nat} {s0 : Tm (S m_Tm)} {t0 : Tm (S m_Tm)}
   (H0 : s0 = t0) : Abs m_Tm s0 = Abs m_Tm t0.
@@ -65,6 +66,11 @@ exact (eq_trans (eq_trans eq_refl (ap (fun x => Pi m_Tm x s1) H0))
          (ap (fun x => Pi m_Tm t0 x) H1)).
 Qed.
 
+Lemma congr_Bot {m_Tm : nat} : Bot m_Tm = Bot m_Tm.
+Proof.
+exact (eq_refl).
+Qed.
+
 Lemma upRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n) :
   fin (S m) -> fin (S n).
 Proof.
@@ -86,6 +92,7 @@ Fixpoint ren_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
   | Pair _ s0 s1 => Pair n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1)
   | Proj _ s0 s1 => Proj n_Tm s0 (ren_Tm xi_Tm s1)
   | Pi _ s0 s1 => Pi n_Tm (ren_Tm xi_Tm s0) (ren_Tm (upRen_Tm_Tm xi_Tm) s1)
+  | Bot _ => Bot n_Tm
   end.
 
 Lemma up_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm) :
@@ -111,6 +118,7 @@ Fixpoint subst_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
   | Proj _ s0 s1 => Proj n_Tm s0 (subst_Tm sigma_Tm s1)
   | Pi _ s0 s1 =>
       Pi n_Tm (subst_Tm sigma_Tm s0) (subst_Tm (up_Tm_Tm sigma_Tm) s1)
+  | Bot _ => Bot n_Tm
   end.
 
 Lemma upId_Tm_Tm {m_Tm : nat} (sigma : fin m_Tm -> Tm m_Tm)
@@ -149,6 +157,7 @@ subst_Tm sigma_Tm s = s :=
   | Pi _ s0 s1 =>
       congr_Pi (idSubst_Tm sigma_Tm Eq_Tm s0)
         (idSubst_Tm (up_Tm_Tm sigma_Tm) (upId_Tm_Tm _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma upExtRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n)
@@ -191,6 +200,7 @@ Fixpoint extRen_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
       congr_Pi (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
         (extRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
            (upExtRen_Tm_Tm _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma upExt_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm)
@@ -234,6 +244,7 @@ Fixpoint ext_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
       congr_Pi (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
         (ext_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm) (upExt_Tm_Tm _ _ Eq_Tm)
            s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma up_ren_ren_Tm_Tm {k : nat} {l : nat} {m : nat} (xi : fin k -> fin l)
@@ -277,6 +288,7 @@ Fixpoint compRenRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
       congr_Pi (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
         (compRenRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
            (upRen_Tm_Tm rho_Tm) (up_ren_ren _ _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma up_ren_subst_Tm_Tm {k : nat} {l : nat} {m_Tm : nat}
@@ -330,6 +342,7 @@ Fixpoint compRenSubst_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
       congr_Pi (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
         (compRenSubst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm tau_Tm)
            (up_Tm_Tm theta_Tm) (up_ren_subst_Tm_Tm _ _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma up_subst_ren_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -404,6 +417,7 @@ ren_Tm zeta_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
       congr_Pi (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
         (compSubstRen_Tm (up_Tm_Tm sigma_Tm) (upRen_Tm_Tm zeta_Tm)
            (up_Tm_Tm theta_Tm) (up_subst_ren_Tm_Tm _ _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma up_subst_subst_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -479,6 +493,7 @@ subst_Tm tau_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
       congr_Pi (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
         (compSubstSubst_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm)
            (up_Tm_Tm theta_Tm) (up_subst_subst_Tm_Tm _ _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma renRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
@@ -593,6 +608,7 @@ Fixpoint rinst_inst_Tm {m_Tm : nat} {n_Tm : nat}
       congr_Pi (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
         (rinst_inst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm sigma_Tm)
            (rinstInst_up_Tm_Tm _ _ Eq_Tm) s1)
+  | Bot _ => congr_Bot
   end.
 
 Lemma rinstInst'_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
@@ -790,6 +806,8 @@ Import
 Core.
 
 Arguments VarTm {n_Tm}.
+
+Arguments Bot {n_Tm}.
 
 Arguments Pi {n_Tm}.
 
