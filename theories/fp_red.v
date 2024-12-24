@@ -752,6 +752,14 @@ Proof.
   sfirstorder use:relations.diamond_confluent, EPar_diamond.
 Qed.
 
+Fixpoint prov {n} A B (a : Tm n) : Prop :=
+  match a with
+  | Pi A0 B0 => rtc Par.R A A0 /\ rtc Par.R B B0
+  | App a b => prov A B a
+  | Abs a => prov A B (subst_Tm (scons A VarTm) a)
+  | _ => True
+  end.
+
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->
   rtc Par.R c b1 ->
