@@ -690,3 +690,26 @@ Lemma RPar_diamond n (c a1 b1 : Tm n) :
   RPar.R c b1 ->
   exists d2, RPar.R a1 d2 /\ RPar.R b1 d2.
 Proof. hauto l:on use:RPar_triangle. Qed.
+
+Lemma RPar_confluent n (c a1 b1 : Tm n) :
+  rtc RPar.R c a1 ->
+  rtc RPar.R c b1 ->
+  exists d2, rtc RPar.R a1 d2 /\ rtc RPar.R b1 d2.
+Proof.
+  sfirstorder use:relations.diamond_confluent, RPar_diamond.
+Qed.
+
+Lemma EPar_confluent n (c a1 b1 : Tm n) :
+  rtc EPar.R c a1 ->
+  rtc EPar.R c b1 ->
+  exists d2, rtc EPar.R a1 d2 /\ rtc EPar.R b1 d2.
+Proof.
+  sfirstorder use:relations.diamond_confluent, EPar_diamond.
+Qed.
+
+Lemma Par_confluent n (c a1 b1 : Tm n) :
+  rtc Par.R c a1 ->
+  rtc Par.R c b1 ->
+  exists d2, rtc Par.R a1 d2 /\ rtc Par.R b1 d2.
+Proof.
+Admitted.
