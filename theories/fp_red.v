@@ -557,6 +557,53 @@ Proof.
   - hauto l:on ctrs:OExp.R.
 Qed.
 
+Lemma Proj_EPar' n p a (b : Tm n) :
+  EPar.R (Proj p a) b ->
+  (exists d, EPar.R a d /\
+          rtc OExp.R (Proj p d) b).
+Proof.
+  move E : (Proj p a) => u h.
+  move : p a E.
+  elim : n u b /h => //=.
+  - move => n a0 a1 ha iha a p ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 ha iha a p ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
+Lemma App_EPar' n (a b u : Tm n)  :
+  EPar.R (App a b) u ->
+  (exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (App a0 b0) u).
+Proof.
+  move E : (App a b) => t h.
+  move : a b E. elim : n t u /h => //=.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
+Lemma Pair_EPar' n (a b u : Tm n) :
+  EPar.R (Pair a b) u ->
+  exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (Pair a0 b0) u.
+Proof.
+  move E : (Pair a b) => t h.
+  move : a b E. elim : n t u /h => //=.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
 Lemma EPar_diamond n (c a1 b1 : Tm n) :
   EPar.R c a1 ->
   EPar.R c b1 ->
@@ -568,21 +615,37 @@ Proof.
     hauto lq:on ctrs:EPar.R use:EPar.renaming.
   - hauto lq:on rew:off ctrs:EPar.R.
   - hauto lq:on use:EPar.refl.
-  - move => n a0 a1 ha iha a2 ha2.
-    move /Abs_EPar' : (ha2).
-    move => [d [hd0 hd1]].
-    move : iha (hd0); repeat move/[apply].
+  - move => n a0 a1 ha iha a2.
+    move /Abs_EPar' => [d [hd0 hd1]].
+    move : iha hd0; repeat move/[apply].
     move => [d2 [h0 h1]].
     have : EPar.R (Abs d) (Abs d2) by eauto using EPar.AbsCong.
-    move :  hd1.
-    move : OExp.commutativity0; repeat move/[apply].
+    move : OExp.commutativity0 hd1; repeat move/[apply].
     move => [d1 [hd1 hd2]].
-    exists d1. split => //.
-    hauto lq:on ctrs:EPar.R use:OExp.merge.
-  - move => n a0 a1 b0 b1 ha iha hb ihb c hc.
-    admit.
-  - admit.
-  - best.
+    exists d1. hauto lq:on ctrs:EPar.R use:OExp.merge.
+  - move => n a0 a1 b0 b1 ha iha hb ihb c.
+    move /App_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
+    have : EPar.R (App a2 b2)(App a3 b3)
+      by hauto l:on use:EPar.AppCong.
+    move : OExp.commutativity0 h2; repeat move/[apply].
+    move => [d h].
+    exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+  - move => n a0 a1 b0 b1 ha iha hb ihb c.
+    move /Pair_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
+    have : EPar.R (Pair a2 b2)(Pair a3 b3)
+      by hauto l:on use:EPar.PairCong.
+    move : OExp.commutativity0 h2; repeat move/[apply].
+    move => [d h].
+    exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+  - move => n p a0 a1 ha iha b.
+    move /Proj_EPar' => [d [/iha [d2 h] h1]] {iha}.
+    have : EPar.R (Proj p d) (Proj p d2)
+      by hauto l:on use:EPar.ProjCong.
+    move : OExp.commutativity0 h1; repeat move/[apply].
+    move => [d1 h1].
+    exists d1. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+Qed.
+
 
 
 
