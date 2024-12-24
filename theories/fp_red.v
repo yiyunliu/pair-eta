@@ -49,7 +49,11 @@ Module Par.
     R (Pair a0 b0) (Pair a1 b1)
   | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj p a0) (Proj p a1).
+    R (Proj p a0) (Proj p a1)
+  | PiCong A0 A1 B0 B1:
+    R A0 A1 ->
+    R B0 B1 ->
+    R (Pi A0 B0) (Pi A1 B1).
 End Par.
 
 (***************** Beta rules only ***********************)
@@ -89,7 +93,11 @@ Module RPar.
     R (Pair a0 b0) (Pair a1 b1)
   | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj p a0) (Proj p a1).
+    R (Proj p a0) (Proj p a1)
+  | PiCong A0 A1 B0 B1:
+    R A0 A1 ->
+    R B0 B1 ->
+    R (Pi A0 B0) (Pi A1 B1).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -154,6 +162,7 @@ Module RPar.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R use:morphing_up.
   Qed.
 
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
@@ -196,7 +205,11 @@ Module EPar.
     R (Pair a0 b0) (Pair a1 b1)
   | ProjCong p a0 a1 :
     R a0 a1 ->
-    R (Proj p a0) (Proj p a1).
+    R (Proj p a0) (Proj p a1)
+  | PiCong A0 A1 B0 B1:
+    R A0 A1 ->
+    R B0 B1 ->
+    R (Pi A0 B0) (Pi A1 B1).
 
   Lemma refl n (a : Tm n) : EPar.R a a.
   Proof.
@@ -238,6 +251,7 @@ Module EPar.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
+    - hauto l:on ctrs:R use:renaming inv:option.
   Qed.
 
   Lemma substing n a0 a1 (b0 b1 : Tm n) :
@@ -313,6 +327,12 @@ Module RPars.
     rtc RPar.R a0 a1 ->
     rtc RPar.R b0 b1 ->
     rtc RPar.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma PiCong n (a0 a1 : Tm n) b0 b1 :
+    rtc RPar.R a0 a1 ->
+    rtc RPar.R b0 b1 ->
+    rtc RPar.R (Pi a0 b0) (Pi a1 b1).
   Proof. solve_s. Qed.
 
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
@@ -530,6 +550,7 @@ Proof.
       exists d. split => //.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
+  - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.PiCong.
 Qed.
 
 Lemma commutativity1 n (a b0 b1 : Tm n) :
@@ -599,6 +620,21 @@ Proof.
   - hauto l:on ctrs:OExp.R.
 Qed.
 
+Lemma Pi_EPar' n (a : Tm n) b u  :
+  EPar.R (Pi a b) u ->
+  (exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (Pi a0 b0) u).
+Proof.
+  move E : (Pi a b) => t h.
+  move : a b E. elim : n t u /h => //=.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 ha iha a b ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
 Lemma Pair_EPar' n (a b u : Tm n) :
   EPar.R (Pair a b) u ->
   exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (Pair a0 b0) u.
@@ -654,6 +690,13 @@ Proof.
     move : OExp.commutativity0 h1; repeat move/[apply].
     move => [d1 h1].
     exists d1. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+  - move => n a0 a1 b0 b1 ha iha hb ihb c.
+    move /Pi_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
+    have : EPar.R (Pi a2 b2)(Pi a3 b3)
+      by hauto l:on use:EPar.PiCong.
+    move : OExp.commutativity0 h2; repeat move/[apply].
+    move => [d h].
+    exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
 Qed.
 
 Function tstar {n} (a : Tm n) :=
@@ -668,6 +711,7 @@ Function tstar {n} (a : Tm n) :=
   | Proj p (Pair a b) => if p is PL then (tstar a) else (tstar b)
   | Proj p (Abs a) => (Abs (Proj p (tstar a)))
   | Proj p a => Proj p (tstar a)
+  | Pi a b => Pi (tstar a) (tstar b)
   end.
 
 Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
@@ -681,6 +725,7 @@ Proof.
   - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
 Qed.
