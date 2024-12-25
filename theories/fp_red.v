@@ -892,10 +892,9 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   prov A B Bot := False;
   prov A B (VarTm _) := False.
 
-#[tactic="extract_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
+#[tactic="prov_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (Pi A B) := Pi A B;
-  extract (Abs a) := subst_Tm (scons Bot VarTm) (extract a)
-
+  extract (Abs a) := subst_Tm (scons Bot VarTm) (extract a);
   extract (App a b) := extract a;
   extract (Pair a b) := extract a;
   extract (Proj p a) := extract a;
@@ -922,7 +921,14 @@ Proof.
   move : m ξ. elim : n/a.
   - sfirstorder.
   - move => n a ih m ξ. simpl. simp extract.
-(* Admitted. *)
+    rewrite ih.
+    by asimpl.
+  - hauto q:on rew:db:extract.
+  - hauto q:on rew:db:extract.
+  - hauto q:on rew:db:extract.
+  - hauto q:on rew:db:extract.
+  - sfirstorder.
+Qed.
 
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
@@ -986,7 +992,7 @@ Proof.
   elim : n a b /h.
   - move => n a0 a1 b0 b1 ha iha hb ihb A B /=.
     simp prov => h.
-    have : prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a1 by admit.
+    move /iha : h.
     move /(prov_morph _ _ (scons b1 VarTm)).
     by asimpl.
   - hauto lq:on rew:db:prov.
@@ -1004,7 +1010,7 @@ Proof.
     move => [hA0 hA1].
     eauto using rtc_r.
   - sfirstorder.
-Admitted.
+Qed.
 
 Lemma prov_pars n (A : Tm n) B a b : prov A B a -> rtc Par.R a b -> prov A B b.
 Proof.
@@ -1028,11 +1034,10 @@ Proof.
         by admit.
     move => [B1 [h5 h6]].
     subst.
-    have {}h0 : extract a = ren_Tm shift (Pi A1 B1) by done.
-    have : exists a1, extract a1 = Pi A1 B1 /\ ren_Tm shift a1 = a by admit.
-    move => [a1 [h6 ?]]. subst.
-    asimpl. exists A1, B1.
-    repeat split => //=.
+    have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
+                  subst_Tm (scons Bot VarTm) (ren_Tm shift (Pi A1 B1)) by sauto lq:on.
+    move : h0. asimpl. move => ->.
+    hauto lq:on.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
