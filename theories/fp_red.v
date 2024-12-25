@@ -1,3 +1,6 @@
+From Ltac2 Require Ltac2.
+Import Ltac2.Notations.
+Import Ltac2.Control.
 Require Import ssreflect.
 Require Import FunInd.
 Require Import Arith.Wf_nat.
@@ -6,6 +9,16 @@ From stdpp Require Import relations (rtc (..), rtc_once, rtc_r).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
 From Equations Require Import Equations.
+
+Ltac2 spec_refl () :=
+  List.iter
+    (fun a => match a with
+           | (i, _, _) =>
+               let h := Control.hyp i in
+               try (specialize $h with (1 := eq_refl))
+           end)  (Control.hyps ()).
+
+Ltac spec_refl := ltac2:(spec_refl ()).
 
 
 (* Trying my best to not write C style module_funcname *)
@@ -60,6 +73,9 @@ Module Par.
   | BotCong :
     R Bot Bot.
 
+  Lemma refl n (a : Tm n) : R a a.
+    elim : n /a; hauto ctrs:R.
+  Qed.
 
   Lemma AppAbs' n a0 a1 (b0 b1 t : Tm n) :
     t = subst_Tm (scons b1 VarTm) a1 ->
@@ -93,6 +109,109 @@ Module Par.
           end.
   Qed.
 
+
+  Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    R a b -> R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
+  Proof.
+    move => + h. move : m ρ0 ρ1. elim : n a b/h.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ0 ρ1 hρ /=.
+      eapply AppAbs' with (a1 := subst_Tm (up_Tm_Tm ρ1) a1); eauto.
+      by asimpl.
+      hauto l:on use:renaming inv:option.
+    - hauto lq:on rew:off ctrs:R.
+    - hauto l:on inv:option use:renaming ctrs:R.
+    - hauto lq:on use:ProjPair'.
+    - move => n a0 a1 ha iha m ρ0 ρ1 hρ /=.
+      apply : AppEta'; eauto. by asimpl.
+    - hauto lq:on ctrs:R.
+    - sfirstorder.
+    - hauto l:on inv:option ctrs:R use:renaming.
+    - hauto q:on ctrs:R.
+    - qauto l:on ctrs:R.
+    - qauto l:on ctrs:R.
+    - hauto l:on inv:option ctrs:R use:renaming.
+    - sfirstorder.
+  Qed.
+
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    R a b -> R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. hauto l:on use:morphing, refl. Qed.
+
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ξ : fin n -> fin m) :
+    R (ren_Tm ξ a) b -> exists b0, R a b0 /\ ren_Tm ξ b0 = b.
+  Proof.
+    move E : (ren_Tm ξ a) => u h.
+    move : n ξ a E. elim : m u b/h.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//=.
+      move => c c0 [+ ?]. subst.
+      case : c => //=.
+      move => c [?]. subst.
+      spec_refl.
+      move : iha => [c1][ih0]?. subst.
+      move : ihb => [c2][ih1]?. subst.
+      eexists. split.
+      apply AppAbs; eauto.
+      by asimpl.
+    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//=.
+      move => []//= t t0 t1 [*]. subst.
+      spec_refl.
+      move : iha => [? [*]].
+      move : ihb => [? [*]].
+      move : ihc => [? [*]].
+      eexists. split.
+      apply AppPair; hauto. subst.
+      by asimpl.
+    - move => n p a0 a1 ha iha m ξ []//= p0 []//= t [*]. subst.
+      spec_refl. move : iha => [b0 [? ?]]. subst.
+      eexists. split. apply ProjAbs; eauto. by asimpl.
+    - move => n p a0 a1 b0 b1 ha iha hb ihb m ξ []//= p0 []//= t t0[*].
+      subst. spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by eauto using ProjPair.
+      hauto q:on.
+    - move => n a0 a1 ha iha m ξ a ?. subst.
+      spec_refl. move : iha => [a0 [? ?]]. subst.
+      eexists. split. apply AppEta; eauto.
+      by asimpl.
+    - move => n a0 a1 ha iha m ξ a ?. subst.
+      spec_refl. move : iha => [b0 [? ?]]. subst.
+      eexists. split. apply PairEta; eauto.
+      by asimpl.
+    - move => n i m ξ []//=.
+      hauto l:on.
+    - move => n a0 a1 ha iha m ξ []//= t [*]. subst.
+      spec_refl.
+      move  :iha => [b0 [? ?]]. subst.
+      eexists. split. by apply AbsCong; eauto.
+      by asimpl.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0 [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply AppCong; eauto.
+      done.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0[*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply PairCong; eauto.
+      by asimpl.
+    - move => n p a0 a1 ha iha m ξ []//= p0 t [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      eexists. split. by apply ProjCong; eauto.
+      by asimpl.
+    - move => n A0 A1 B0 B1 ha iha hB ihB m ξ []//= t t0 [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihB => [c0 [? ?]]. subst.
+      eexists. split. by apply PiCong; eauto.
+      by asimpl.
+    - hauto lq:on rew:off inv:Tm.
+  Qed.
+
 End Par.
 
 Module Pars.
@@ -105,7 +224,9 @@ Module Pars.
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
     rtc Par.R a b ->
     rtc Par.R (subst_Tm ρ a) (subst_Tm ρ b).
-  Admitted.
+    induction 1; hauto l:on ctrs:rtc use:Par.substing.
+  Qed.
+
 End Pars.
 
 (***************** Beta rules only ***********************)
