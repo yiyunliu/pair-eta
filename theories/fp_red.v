@@ -856,6 +856,53 @@ Local Ltac prov_tac := sfirstorder use:depth_ren.
   prov A B Bot := False;
   prov A B (VarTm _) := False.
 
+Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
+  extract (Pi A B) := Pi A B;
+  extract (Abs a) := extract (subst_Tm (scons Bot VarTm) a);
+  extract (App a b) := extract a;
+  extract (Pair a b) := extract a;
+  extract (Proj p a) := extract a;
+  extract Bot := Bot;
+  extract (VarTm _) := Bot.
+Next Obligation.
+Admitted.
+
+Next Obligation.
+  sfirstorder.
+Qed.
+
+Next Obligation.
+  sfirstorder.
+Qed.
+
+Lemma prov_extract n A B (a : Tm n) :
+  prov A B a -> exists A0 B0,
+      extract a = Pi A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
+Proof.
+  move : A B. elim : n / a => //=.
+  - move => n a ih A B.
+    simp prov.
+    move /ih.
+    simp extract.
+    move => [A0][B0][h0][h1]h2.
+    (* anti renaming for par *)
+    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0 by admit.
+    move => [A1 [h3 h4]].
+    have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
+        by admit.
+    move => [B1 [h5 h6]].
+    subst.
+    have {}h0 : extract a = ren_Tm shift (Pi A1 B1) by done.
+    have : exists a1, extract a1 = Pi A1 B1 /\ ren_Tm shift a1 = a by admit.
+    move => [a1 [h6 ?]]. subst.
+    asimpl. exists A1, B1.
+    repeat split => //=.
+  - hauto l:on rew:db:prov, extract.
+  - hauto l:on rew:db:prov, extract.
+  - hauto l:on rew:db:prov, extract.
+  - qauto l:on rew:db:prov, extract.
+Admitted.
+
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
   move => ih.
@@ -869,10 +916,6 @@ Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
     apply : ih0.
     lia.
 Qed.
-
-(* forall P : tm -> Prop, *)
-(*        (forall x : tm, (forall y : tm, size_tm y < size_tm x -> P y) -> P x) -> *)
-(*        forall a : tm, P a. *)
 
 Lemma prov_ren n m (ξ : fin n -> fin m) A B a :
   prov A B a -> prov (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
