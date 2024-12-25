@@ -875,34 +875,6 @@ Next Obligation.
   sfirstorder.
 Qed.
 
-Lemma prov_extract n A B (a : Tm n) :
-  prov A B a -> exists A0 B0,
-      extract a = Pi A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
-Proof.
-  move : A B. elim : n / a => //=.
-  - move => n a ih A B.
-    simp prov.
-    move /ih.
-    simp extract.
-    move => [A0][B0][h0][h1]h2.
-    (* anti renaming for par *)
-    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0 by admit.
-    move => [A1 [h3 h4]].
-    have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
-        by admit.
-    move => [B1 [h5 h6]].
-    subst.
-    have {}h0 : extract a = ren_Tm shift (Pi A1 B1) by done.
-    have : exists a1, extract a1 = Pi A1 B1 /\ ren_Tm shift a1 = a by admit.
-    move => [a1 [h6 ?]]. subst.
-    asimpl. exists A1, B1.
-    repeat split => //=.
-  - hauto l:on rew:db:prov, extract.
-  - hauto l:on rew:db:prov, extract.
-  - hauto l:on rew:db:prov, extract.
-  - qauto l:on rew:db:prov, extract.
-Admitted.
-
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
   move => ih.
@@ -984,6 +956,60 @@ Proof.
     eauto using rtc_r.
   - sfirstorder.
 Admitted.
+
+Lemma prov_pars n (A : Tm n) B a b : prov A B a -> rtc Par.R a b -> prov A B b.
+Proof.
+  induction 2; hauto lq:on use:prov_par.
+Qed.
+
+Lemma prov_extract n A B (a : Tm n) :
+  prov A B a -> exists A0 B0,
+      extract a = Pi A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
+Proof.
+  move : A B. elim : n / a => //=.
+  - move => n a ih A B.
+    simp prov.
+    move /ih.
+    simp extract.
+    move => [A0][B0][h0][h1]h2.
+    (* anti renaming for par *)
+    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0 by admit.
+    move => [A1 [h3 h4]].
+    have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
+        by admit.
+    move => [B1 [h5 h6]].
+    subst.
+    have {}h0 : extract a = ren_Tm shift (Pi A1 B1) by done.
+    have : exists a1, extract a1 = Pi A1 B1 /\ ren_Tm shift a1 = a by admit.
+    move => [a1 [h6 ?]]. subst.
+    asimpl. exists A1, B1.
+    repeat split => //=.
+  - hauto l:on rew:db:prov, extract.
+  - hauto l:on rew:db:prov, extract.
+  - hauto l:on rew:db:prov, extract.
+  - qauto l:on rew:db:prov, extract.
+Admitted.
+
+Lemma pi_inv n (A : Tm n) B C :
+  rtc Par.R (Pi A B) C ->
+  exists A0 B0, extract C = Pi A0 B0 /\
+             rtc Par.R A A0 /\ rtc Par.R B B0.
+Proof.
+  have : prov A B (Pi A B) by sfirstorder.
+  move : prov_pars. repeat move/[apply].
+  by move /prov_extract.
+Qed.
+
+Lemma pi_inj n (A0 A1 : Tm n) B0 B1 C :
+  rtc Par.R (Pi A0 B0) C ->
+  rtc Par.R (Pi A1 B1) C ->
+  exists A2 B2, rtc Par.R A0 A2 /\ rtc Par.R A1 A2 /\
+             rtc Par.R B0 B2 /\ rtc Par.R B1 B2.
+Proof.
+  move /pi_inv => [A2 [B2 [? [h0 h1]]]].
+  move /pi_inv => [A3 [B3 [? [h2 h3]]]].
+  exists A2, B2. hauto l:on.
+Qed.
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->
