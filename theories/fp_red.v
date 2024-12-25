@@ -227,6 +227,18 @@ Module Pars.
     induction 1; hauto l:on ctrs:rtc use:Par.substing.
   Qed.
 
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ξ : fin n -> fin m) :
+    rtc Par.R (ren_Tm ξ a) b -> exists b0, rtc Par.R a b0 /\ ren_Tm ξ b0 = b.
+  Proof.
+    move E  :(ren_Tm ξ a) => u h.
+    move : a E.
+    elim : u b /h.
+    - sfirstorder.
+    - move => a b c h0 h1 ih1 a0 ?. subst.
+      move /Par.antirenaming : h0.
+      move => [b0 [h2 ?]]. subst.
+      hauto lq:on rew:off ctrs:rtc.
+  Qed.
 End Pars.
 
 (***************** Beta rules only ***********************)
@@ -1149,10 +1161,11 @@ Proof.
     simp extract.
     move => [A0][B0][h0][h1]h2.
     (* anti renaming for par *)
-    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0 by admit.
+    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0
+        by hauto l:on use:Pars.antirenaming.
     move => [A1 [h3 h4]].
     have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
-        by admit.
+        by hauto l:on use:Pars.antirenaming.
     move => [B1 [h5 h6]].
     subst.
     have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
@@ -1163,7 +1176,7 @@ Proof.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
   - qauto l:on rew:db:prov, extract.
-Admitted.
+Qed.
 
 Lemma pi_inv n (A : Tm n) B C :
   rtc Par.R (Pi A B) C ->
