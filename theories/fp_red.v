@@ -845,7 +845,43 @@ Proof.
   move : m ξ. elim : n / a; scongruence.
 Qed.
 
+Lemma depth_subst n m (ρ : fin n -> Tm m) a :
+  (forall i, depth_tm (ρ i) = 1) ->
+  depth_tm a = depth_tm (subst_Tm ρ a).
+Proof.
+  move : m ρ. elim : n / a.
+  - sfirstorder.
+  - move => n a iha m ρ hρ.
+    simpl.
+    f_equal. apply iha.
+    destruct i as [i|].
+    + simpl.
+      by rewrite -depth_ren.
+    + by simpl.
+  - hauto lq:on rew:off.
+  - hauto lq:on rew:off.
+  - hauto lq:on rew:off.
+  - move => n a iha b ihb m ρ hρ.
+    simpl. f_equal.
+    f_equal.
+    by apply iha.
+    apply ihb.
+    destruct i as [i|].
+    + simpl.
+      by rewrite -depth_ren.
+    + by simpl.
+  - sfirstorder.
+Qed.
+
+Lemma depth_subst_bool n (a : Tm (S n)) :
+  depth_tm a = depth_tm (subst_Tm (scons Bot VarTm) a).
+Proof.
+  apply depth_subst.
+  destruct i as [i|] => //=.
+Qed.
+
 Local Ltac prov_tac := sfirstorder use:depth_ren.
+Local Ltac extract_tac := sfirstorder use:depth_subst_bool.
 
 #[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
@@ -856,7 +892,7 @@ Local Ltac prov_tac := sfirstorder use:depth_ren.
   prov A B Bot := False;
   prov A B (VarTm _) := False.
 
-Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
+#[tactic="extract_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (Pi A B) := Pi A B;
   extract (Abs a) := extract (subst_Tm (scons Bot VarTm) a);
   extract (App a b) := extract a;
@@ -864,16 +900,6 @@ Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (Proj p a) := extract a;
   extract Bot := Bot;
   extract (VarTm _) := Bot.
-Next Obligation.
-Admitted.
-
-Next Obligation.
-  sfirstorder.
-Qed.
-
-Next Obligation.
-  sfirstorder.
-Qed.
 
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
