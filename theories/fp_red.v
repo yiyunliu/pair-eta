@@ -1220,6 +1220,21 @@ Module ERPar.
     sfirstorder use:RPar.refl, EPar.refl.
   Qed.
 
+  Lemma AbsCong n (a0 a1 : Tm (S n)) :
+    R a0 a1 ->
+    rtc R (Abs a0) (Abs a1).
+  Proof.
+    move => [].
+    - move => h.
+      apply rtc_once.
+      left.
+      by apply RPar.AbsCong.
+    - move => h.
+      apply rtc_once.
+      right.
+      by apply EPar.AbsCong.
+  Qed.
+
   Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
     R a0 a1 ->
     R b0 b1 ->
@@ -1240,9 +1255,29 @@ Module ERPar.
     - sfirstorder use:EPar.AppCong, @rtc_once.
   Qed.
 
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    R a0 a1 ->
+    R b0 b1 ->
+    rtc R (Pair a0 b0) (Pair a1 b1).
+  Proof.
+    move => [] + [].
+    - sfirstorder use:RPar.PairCong, @rtc_once.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.PairCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.PairCong, EPar.refl.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.PairCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.PairCong, EPar.refl.
+    - sfirstorder use:EPar.PairCong, @rtc_once.
+  Qed.
+
 End ERPar.
 
-Hint Resolve ERPar.AppCong ERPar.refl : erpar.
+Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong : erpar.
 
 Module ERPars.
   #[local]Ltac solve_s_rec :=
@@ -1251,13 +1286,23 @@ Module ERPars.
   #[local]Ltac solve_s :=
     repeat (induction 1; last by solve_s_rec); apply rtc_refl.
 
-
   Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
     rtc ERPar.R a0 a1 ->
     rtc ERPar.R b0 b1 ->
     rtc ERPar.R (App a0 b0) (App a1 b1).
-    solve_s.
-  Qed.
+  Proof. solve_s. Qed.
+
+  Lemma AbsCong n (a0 a1 : Tm (S n)) :
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R (Abs a0) (Abs a1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R b0 b1 ->
+    rtc ERPar.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
 End ERPars.
 
 Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
@@ -1278,12 +1323,11 @@ Proof.
     apply : relations.rtc_transitive; eauto.
     apply rtc_once. apply ERPar.RPar.
     by apply RPar.AppAbs; eauto using RPar.refl.
-    (* congruence *)
-    admit.
+    eauto using ERPars.AppCong,ERPars.AbsCong.
   - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc.
     apply : rtc_l. apply ERPar.RPar.
     apply RPar.AppPair; eauto using RPar.refl.
-    admit.
+    sfirstorder use:ERPars.AppCong, ERPars.PairCong.
   - move => n p a0 a1 ha iha.
     apply : rtc_l. apply ERPar.RPar. apply RPar.ProjAbs; eauto using RPar.refl.
     admit.
@@ -1297,7 +1341,7 @@ Proof.
     apply : rtc_l. apply ERPar.EPar. apply EPar.PairEta; eauto using EPar.refl.
     admit.
   - sfirstorder.
-  - admit.
+  - sfirstorder use:ERPars.AbsCong.
   - sfirstorder use:ERPars.AppCong.
   - admit.
   - admit.
