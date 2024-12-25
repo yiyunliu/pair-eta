@@ -1296,6 +1296,12 @@ Module ERPar.
     - sfirstorder use:EPar.PairCong, @rtc_once.
   Qed.
 
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    sfirstorder use:EPar.renaming, RPar.renaming.
+  Qed.
+
 End ERPar.
 
 Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong ERPar.ProjCong ERPar.PiCong : erpar.
@@ -1335,6 +1341,15 @@ Module ERPars.
     rtc ERPar.R (Pi a0 b0) (Pi a1 b1).
   Proof. solve_s. Qed.
 
+  Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R (ren_Tm ξ a0) (ren_Tm ξ a1).
+  Proof.
+    induction 1.
+    - apply rtc_refl.
+    - eauto using ERPar.renaming, rtc_l.
+  Qed.
+
 End ERPars.
 
 Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
@@ -1368,7 +1383,8 @@ Proof.
     hauto lq:on.
   - move => n a0 a1 ha iha.
     apply : rtc_l. apply ERPar.EPar. apply EPar.AppEta; eauto using EPar.refl.
-    admit.
+    hauto lq:on ctrs:rtc
+      use:ERPars.AppCong, ERPars.AbsCong, ERPars.renaming.
   - move => n a0 a1 ha iha.
     apply : rtc_l. apply ERPar.EPar. apply EPar.PairEta; eauto using EPar.refl.
     sfirstorder use:ERPars.PairCong, ERPars.ProjCong.
@@ -1379,7 +1395,7 @@ Proof.
   - sfirstorder use:ERPars.ProjCong.
   - sfirstorder use:ERPars.PiCong.
   - sfirstorder.
-Admitted.
+Qed.
 
 Lemma Pars_ERPar n (a b : Tm n) : rtc Par.R a b -> rtc ERPar.R a b.
 Proof.
