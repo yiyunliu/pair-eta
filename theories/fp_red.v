@@ -894,12 +894,35 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
 
 #[tactic="extract_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (Pi A B) := Pi A B;
-  extract (Abs a) := extract (subst_Tm (scons Bot VarTm) a);
+  extract (Abs a) := subst_Tm (scons Bot VarTm) (extract a)
+
   extract (App a b) := extract a;
   extract (Pair a b) := extract a;
   extract (Proj p a) := extract a;
   extract Bot := Bot;
   extract (VarTm _) := Bot.
+
+(* Lemma extract_ren n m a (ξ : fin n -> fin m) : *)
+(*   extract (ren_Tm ξ a) = ren_Tm ξ (extract a). *)
+(* Proof. *)
+
+(* Lemma ren_extract' n m a b (ξ : fin n -> fin m) : *)
+(*   extract a = ren_Tm ξ b -> *)
+(*   exists a0, ren_Tm ξ a0 = a /\ extract a0 = b. *)
+(* Proof. *)
+(*   move : n b ξ. *)
+(*   elim : m / a. *)
+(*   - move => n i m b ξ. simp extract. *)
+(*     case : b => //= _. *)
+(*     exists *)
+
+Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
+  extract (ren_Tm ξ a) = ren_Tm ξ (extract a).
+Proof.
+  move : m ξ. elim : n/a.
+  - sfirstorder.
+  - move => n a ih m ξ. simpl. simp extract.
+(* Admitted. *)
 
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
