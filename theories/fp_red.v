@@ -1204,15 +1204,21 @@ Proof.
   move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
 Qed.
 
+Definition union {A : Type} (R0 R1 : A -> A -> Prop) a b :=
+  R0 a b \/ R1 a b.
+
 Module ERPar.
-  Inductive R {n} (a b : Tm n) : Prop :=
-  | RPar : RPar.R a b -> R a b
-  | EPar : EPar.R a b -> R a b.
+  Definition R {n} (a b : Tm n) := union RPar.R EPar.R a b.
+  Lemma RPar {n} (a b : Tm n) : RPar.R a b -> R a b.
+  Proof. sfirstorder. Qed.
+
+  Lemma EPar {n} (a b : Tm n) : EPar.R a b -> R a b.
+  Proof. sfirstorder. Qed.
 End ERPar.
 
 Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
 Proof.
-  sfirstorder inv:ERPar.R use:EPar_Par, RPar_Par.
+  sfirstorder use:EPar_Par, RPar_Par.
 Qed.
 
 Lemma rtc_idem n (a b : Tm n) : rtc (rtc EPar.R) a b -> rtc EPar.R a b.
@@ -1267,9 +1273,139 @@ Proof.
   sfirstorder use:ERPar_Par, @relations.rtc_subrel.
 Qed.
 
-Lemma Par_confluent n (c a1 b1 : Tm n) :
-  rtc Par.R c a1 ->
-  rtc Par.R c b1 ->
-  exists d2, rtc Par.R a1 d2 /\ rtc Par.R b1 d2.
+Lemma RPar_ERPar n (a b : Tm n) : rtc RPar.R a b -> rtc ERPar.R a b.
 Proof.
-Admitted.
+  sfirstorder use:@relations.rtc_subrel.
+Qed.
+
+Lemma EPar_ERPar n (a b : Tm n) : rtc EPar.R a b -> rtc ERPar.R a b.
+Proof.
+  sfirstorder use:@relations.rtc_subrel.
+Qed.
+
+Module Type HindleyRosen.
+  Parameter A : nat -> Type.
+  Parameter R0 R1 : forall n, A n -> A n -> Prop.
+  Axiom diamond_R0 : forall n, relations.diamond (R0 n).
+  Axiom diamond_R1 : forall n, relations.diamond (R1 n).
+  Axiom commutativity : forall n,
+    forall a b c, R0 n a b -> R1 n a c -> exists d, R1 n b d /\ R0 n c d.
+End HindleyRosen.
+
+Module HindleyRosenFacts (M : HindleyRosen).
+  Import M.
+  Lemma R0_comm :
+    forall n a b c, R0 n a b -> rtc (union (R0 n) (R1 n)) a c ->
+             exists d, rtc (union (R0 n) (R1 n)) b d /\ R0 n c d.
+  Proof.
+    move => n a + c + h.
+    elim : a c /h.
+    - sfirstorder.
+    - move => a0 a1 a2 ha ha0 ih b h.
+      case : ha.
+      + move : diamond_R0 h; repeat move/[apply].
+        hauto lq:on ctrs:rtc.
+      + move : commutativity h; repeat move/[apply].
+        hauto lq:on ctrs:rtc.
+  Qed.
+
+  Lemma R1_comm :
+    forall n a b c, R1 n a b -> rtc (union (R0 n) (R1 n)) a c ->
+             exists d, rtc (union (R0 n) (R1 n)) b d /\ R1 n c d.
+  Proof.
+    move => n a + c + h.
+    elim : a c /h.
+    - sfirstorder.
+    - move => a0 a1 a2 ha ha0 ih b h.
+      case : ha.
+      + move : commutativity h; repeat move/[apply].
+        hauto lq:on ctrs:rtc.
+      + move : diamond_R1 h; repeat move/[apply].
+        hauto lq:on ctrs:rtc.
+  Qed.
+
+  Lemma U_comm :
+    forall n a b c, (union (R0 n) (R1 n)) a b -> rtc (union (R0 n) (R1 n)) a c ->
+             exists d, rtc (union (R0 n) (R1 n)) b d /\ (union (R0 n) (R1 n)) c d.
+  Proof.
+    hauto lq:on use:R0_comm, R1_comm.
+  Qed.
+
+  Lemma U_comms :
+    forall n a b c, rtc (union (R0 n) (R1 n)) a b -> rtc (union (R0 n) (R1 n)) a c ->
+             exists d, rtc (union (R0 n) (R1 n)) b d /\ rtc (union (R0 n) (R1 n)) c d.
+  Proof.
+    move => n a b + h.
+    elim : a b /h.
+    - sfirstorder.
+    - hecrush ctrs:rtc use:U_comm.
+  Qed.
+
+End HindleyRosenFacts.
+
+Module HindleyRosenER <: HindleyRosen.
+  Definition A := Tm.
+  Definition R0 n := rtc (@RPar.R n).
+  Definition R1 n := rtc (@EPar.R n).
+  Lemma diamond_R0 : forall n, relations.diamond (R0 n).
+    sfirstorder use:RPar_confluent.
+  Qed.
+  Lemma diamond_R1 : forall n, relations.diamond (R1 n).
+    sfirstorder use:EPar_confluent.
+  Qed.
+  Lemma commutativity : forall n,
+    forall a b c, R0 n a b -> R1 n a c -> exists d, R1 n b d /\ R0 n c d.
+  Proof.
+    hauto l:on use:commutativity.
+  Qed.
+End HindleyRosenER.
+
+Module ERFacts := HindleyRosenFacts HindleyRosenER.
+
+Lemma rtc_union n (a b : Tm n) :
+  rtc (union RPar.R EPar.R) a b <->
+    rtc (union (rtc RPar.R) (rtc EPar.R)) a b.
+Proof.
+  split; first by induction 1; hauto lq:on ctrs:rtc.
+  move => h.
+  elim  :a b /h.
+  - sfirstorder.
+  - move => a0 a1 a2.
+    case.
+    + move => h0 h1 ih.
+      apply : relations.rtc_transitive; eauto.
+      move : h0.
+      apply relations.rtc_subrel.
+      sfirstorder.
+    + move => h0 h1 ih.
+      apply : relations.rtc_transitive; eauto.
+      move : h0.
+      apply relations.rtc_subrel.
+      sfirstorder.
+Qed.
+
+Lemma Par_confluent n (a b c : Tm n) :
+  rtc Par.R a b ->
+  rtc Par.R a c ->
+  exists d, rtc Par.R b d /\ rtc Par.R c d.
+Proof.
+  move : n a b c.
+  suff : forall (n : nat) (a b c : Tm n),
+      rtc ERPar.R a b ->
+      rtc ERPar.R a c -> exists d : Tm n, rtc ERPar.R b d /\ rtc ERPar.R c d.
+  move => h n a b c h0 h1.
+  apply Par_ERPar_iff in h0, h1.
+  move : h h0 h1; repeat move/[apply].
+  hauto lq:on use:Par_ERPar_iff.
+  have h := ERFacts.U_comms.
+  move => n a b c.
+  rewrite /HindleyRosenER.R0 /HindleyRosenER.R1 in h.
+  specialize h with (n := n).
+  rewrite /HindleyRosenER.A in h.
+  rewrite /ERPar.R.
+  have eq : (fun a0 b0 : Tm n => union RPar.R EPar.R a0 b0) = union RPar.R EPar.R by reflexivity.
+  rewrite !{}eq.
+  move /rtc_union => + /rtc_union.
+  move : h; repeat move/[apply].
+  hauto lq:on use:rtc_union.
+Qed.
