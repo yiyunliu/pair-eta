@@ -1034,20 +1034,6 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   extract Bot := Bot;
   extract (VarTm _) := Bot.
 
-(* Lemma extract_ren n m a (ξ : fin n -> fin m) : *)
-(*   extract (ren_Tm ξ a) = ren_Tm ξ (extract a). *)
-(* Proof. *)
-
-(* Lemma ren_extract' n m a b (ξ : fin n -> fin m) : *)
-(*   extract a = ren_Tm ξ b -> *)
-(*   exists a0, ren_Tm ξ a0 = a /\ extract a0 = b. *)
-(* Proof. *)
-(*   move : n b ξ. *)
-(*   elim : m / a. *)
-(*   - move => n i m b ξ. simp extract. *)
-(*     case : b => //= _. *)
-(*     exists *)
-
 Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
   extract (ren_Tm ξ a) = ren_Tm ξ (extract a).
 Proof.
@@ -1220,6 +1206,21 @@ Module ERPar.
     sfirstorder use:RPar.refl, EPar.refl.
   Qed.
 
+  Lemma ProjCong n p (a0 a1 : Tm n) :
+    R a0 a1 ->
+    rtc R (Proj p a0) (Proj p a1).
+  Proof.
+    move => [].
+    - move => h.
+      apply rtc_once.
+      left.
+      by apply RPar.ProjCong.
+    - move => h.
+      apply rtc_once.
+      right.
+      by apply EPar.ProjCong.
+  Qed.
+
   Lemma AbsCong n (a0 a1 : Tm (S n)) :
     R a0 a1 ->
     rtc R (Abs a0) (Abs a1).
@@ -1255,6 +1256,26 @@ Module ERPar.
     - sfirstorder use:EPar.AppCong, @rtc_once.
   Qed.
 
+  Lemma PiCong n (a0 a1 : Tm n) b0 b1:
+    R a0 a1 ->
+    R b0 b1 ->
+    rtc R (Pi a0 b0) (Pi a1 b1).
+  Proof.
+    move => [] + [].
+    - sfirstorder use:RPar.PiCong, @rtc_once.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.PiCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.PiCong, EPar.refl.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.PiCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.PiCong, EPar.refl.
+    - sfirstorder use:EPar.PiCong, @rtc_once.
+  Qed.
+
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
     R a0 a1 ->
     R b0 b1 ->
@@ -1277,7 +1298,7 @@ Module ERPar.
 
 End ERPar.
 
-Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong : erpar.
+Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong ERPar.ProjCong ERPar.PiCong : erpar.
 
 Module ERPars.
   #[local]Ltac solve_s_rec :=
@@ -1301,6 +1322,17 @@ Module ERPars.
     rtc ERPar.R a0 a1 ->
     rtc ERPar.R b0 b1 ->
     rtc ERPar.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma ProjCong n p (a0 a1 : Tm n) :
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+
+  Lemma PiCong n (a0 a1 : Tm n) b0 b1:
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R b0 b1 ->
+    rtc ERPar.R (Pi a0 b0) (Pi a1 b1).
   Proof. solve_s. Qed.
 
 End ERPars.
@@ -1330,22 +1362,22 @@ Proof.
     sfirstorder use:ERPars.AppCong, ERPars.PairCong.
   - move => n p a0 a1 ha iha.
     apply : rtc_l. apply ERPar.RPar. apply RPar.ProjAbs; eauto using RPar.refl.
-    admit.
+    sfirstorder use:ERPars.AbsCong, ERPars.ProjCong.
   - move => n p a0 a1 b0 b1 ha iha hb ihb.
     apply : rtc_l. apply ERPar.RPar. apply RPar.ProjPair; eauto using RPar.refl.
-    admit.
+    hauto lq:on.
   - move => n a0 a1 ha iha.
     apply : rtc_l. apply ERPar.EPar. apply EPar.AppEta; eauto using EPar.refl.
     admit.
   - move => n a0 a1 ha iha.
     apply : rtc_l. apply ERPar.EPar. apply EPar.PairEta; eauto using EPar.refl.
-    admit.
+    sfirstorder use:ERPars.PairCong, ERPars.ProjCong.
   - sfirstorder.
   - sfirstorder use:ERPars.AbsCong.
   - sfirstorder use:ERPars.AppCong.
-  - admit.
-  - admit.
-  - admit.
+  - sfirstorder use:ERPars.PairCong.
+  - sfirstorder use:ERPars.ProjCong.
+  - sfirstorder use:ERPars.PiCong.
   - sfirstorder.
 Admitted.
 
