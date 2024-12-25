@@ -1,5 +1,7 @@
 Require Import ssreflect.
 Require Import FunInd.
+Require Import Arith.Wf_nat.
+Require Import Psatz.
 From stdpp Require Import relations (rtc (..), rtc_once, rtc_r).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
@@ -790,39 +792,60 @@ Fixpoint depth_tm {n} (a : Tm n) :=
   | Bot => 1
   end.
 
-Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
+Lemma depth_ren n m (ξ: fin n -> fin m) a :
+  depth_tm a = depth_tm (ren_Tm ξ a).
+Proof.
+  move : m ξ. elim : n / a; scongruence.
+Qed.
+
+Local Ltac prov_tac := sfirstorder use:depth_ren.
+
+#[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
-  prov A B (Abs a) := prov A B (subst_Tm (scons Bot VarTm) a);
+  prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm shift B) a;
   prov A B (App a b) := prov A B a;
   prov A B (Pair a b) := prov A B a /\ prov A B b;
   prov A B (Proj p a) := prov A B a;
   prov A B Bot := False;
   prov A B (VarTm _) := False.
-Next Obligation.
-Admitted.
 
-Next Obligation.
-  sfirstorder.
+Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
+  (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
+  move => ih.
+  suff : forall m n (a : Tm n), depth_tm a <= m -> P n a by sfirstorder.
+  elim.
+  - move => n a h.
+    apply ih. lia.
+  - move => n ih0 m a h.
+    apply : ih.
+    move => m0 b h0.
+    apply : ih0.
+    lia.
 Qed.
 
-Next Obligation.
-  sfirstorder.
-Qed.
-
-Next Obligation.
-  sfirstorder.
-Qed.
+Lemma prov_ren n m (ξ : fin n -> fin m) A B a :
+  prov A B a -> prov (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
+Proof.
+  move : n a m ξ A B.
+  have := (induction_ltof1 _ depth_tm).
+  rewrite /ltof.
+  move => h. epaply h.
+  elim /(induction_ltof1 _ depth_tm).
+  have := lt_wf.
 
 Lemma prov_par n (A : Tm n) B a b : prov A B a -> EPar.R a b -> prov A B b.
 Proof.
   move => + h. move : A B.
   elim : n a b /h.
   - move => n a0 a1 ha iha A B. simp prov. move /iha.
-    asimpl. simp prov.
+
+  (* asimpl. simp prov. *)
+    admit.
   - hauto l:on rew:db:prov.
   - simp prov.
   - move => n a0 a1 ha iha A B. simp prov.
-
+  - hauto l:on rew:db:prov.
+  - hauto l:on rew:db:prov.
 
 
 
