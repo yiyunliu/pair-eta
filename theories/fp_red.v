@@ -1215,12 +1215,19 @@ Proof.
   sfirstorder inv:ERPar.R use:EPar_Par, RPar_Par.
 Qed.
 
+Lemma rtc_idem n (a b : Tm n) : rtc (rtc EPar.R) a b -> rtc EPar.R a b.
+Proof.
+  induction 1; hauto l:on use:@relations.rtc_transitive, @rtc_r.
+Qed.
+
 Lemma Par_ERPar n (a b : Tm n) : Par.R a b -> rtc ERPar.R a b.
 Proof.
   move => h. elim : n a b /h.
   - move => n a0 a1 b0 b1 ha iha hb ihb.
-    apply : rtc_l. apply ERPar.RPar.
-    apply RPar.AppAbs; eauto using RPar.refl.
+    suff ? : rtc ERPar.R (App (Abs a0) b0) (App (Abs a1) b1).
+    apply : relations.rtc_transitive; eauto.
+    apply rtc_once. apply ERPar.RPar.
+    by apply RPar.AppAbs; eauto using RPar.refl.
     (* congruence *)
     admit.
   - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc.
@@ -1247,6 +1254,18 @@ Proof.
   - admit.
   - sfirstorder.
 Admitted.
+
+Lemma Pars_ERPar n (a b : Tm n) : rtc Par.R a b -> rtc ERPar.R a b.
+Proof.
+  induction 1; hauto l:on use:Par_ERPar, @relations.rtc_transitive.
+Qed.
+
+Lemma Par_ERPar_iff n (a b : Tm n) : rtc Par.R a b <-> rtc ERPar.R a b.
+Proof.
+  split.
+  sfirstorder use:Pars_ERPar, @relations.rtc_subrel.
+  sfirstorder use:ERPar_Par, @relations.rtc_subrel.
+Qed.
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->
