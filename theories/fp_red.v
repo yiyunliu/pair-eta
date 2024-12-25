@@ -802,7 +802,7 @@ Local Ltac prov_tac := sfirstorder use:depth_ren.
 
 #[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
-  prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm shift B) a;
+  prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a;
   prov A B (App a b) := prov A B a;
   prov A B (Pair a b) := prov A B a /\ prov A B b;
   prov A B (Proj p a) := prov A B a;
@@ -823,30 +823,52 @@ Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
     lia.
 Qed.
 
+(* forall P : tm -> Prop, *)
+(*        (forall x : tm, (forall y : tm, size_tm y < size_tm x -> P y) -> P x) -> *)
+(*        forall a : tm, P a. *)
+
 Lemma prov_ren n m (ξ : fin n -> fin m) A B a :
   prov A B a -> prov (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
 Proof.
-  move : n a m ξ A B.
-  have := (induction_ltof1 _ depth_tm).
-  rewrite /ltof.
-  move => h. epaply h.
-  elim /(induction_ltof1 _ depth_tm).
-  have := lt_wf.
+  move : m ξ A B. elim : n / a.
+  - sfirstorder.
+  - move => n a ih m ξ A B.
+    simp prov. simpl.
+    move /ih => {ih}.
+    move /(_ _ (upRen_Tm_Tm ξ)).
+    simp prov. by asimpl.
+  - hauto q:on rew:db:prov.
+  - qauto l:on rew:db:prov.
+  - hauto lq:on rew:db:prov.
+  - move => n A0 ih B0 h0 m ξ A B. simpl.
+    simp prov.
+    admit.
+  - sfirstorder.
+Admitted.
+
+Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
+Proof.
+  move => h. elim : n a b /h; qauto ctrs:Par.R.
+Qed.
 
 Lemma prov_par n (A : Tm n) B a b : prov A B a -> EPar.R a b -> prov A B b.
 Proof.
   move => + h. move : A B.
   elim : n a b /h.
   - move => n a0 a1 ha iha A B. simp prov. move /iha.
-
-  (* asimpl. simp prov. *)
-    admit.
+    hauto l:on use:prov_ren.
   - hauto l:on rew:db:prov.
   - simp prov.
   - move => n a0 a1 ha iha A B. simp prov.
   - hauto l:on rew:db:prov.
   - hauto l:on rew:db:prov.
-
+  - hauto lq:on rew:db:prov.
+  - move => n A0 A1 B0 B1 hA ihA hB ihB A B. simp prov.
+    move => [hA0 hA1].
+    apply EPar_Par in hA, hB.
+    eauto using rtc_r.
+  - sfirstorder.
+Qed.
 
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
