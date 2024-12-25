@@ -59,7 +59,54 @@ Module Par.
     R (Pi A0 B0) (Pi A1 B1)
   | BotCong :
     R Bot Bot.
+
+
+  Lemma AppAbs' n a0 a1 (b0 b1 t : Tm n) :
+    t = subst_Tm (scons b1 VarTm) a1 ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App (Abs a0) b0) t.
+  Proof. move => ->. apply AppAbs. Qed.
+
+  Lemma ProjPair' n p (a0 a1 b0 b1 : Tm n) t :
+    t = (if p is PL then a1 else b1) ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) t.
+  Proof.  move => > ->. apply ProjPair. Qed.
+
+  Lemma AppEta' n (a0 a1 b : Tm n) :
+    b = (Abs (App (ren_Tm shift a1) (VarTm var_zero))) ->
+    R a0 a1 ->
+    R a0 b.
+  Proof. move => ->; apply AppEta. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h.
+    move => *; apply : AppAbs'; eauto; by asimpl.
+    all : match goal with
+          | [ |- context[var_zero]] => move => *; apply : AppEta'; eauto; by asimpl
+          | _ => qauto ctrs:R use:ProjPair'
+          end.
+  Qed.
+
 End Par.
+
+Module Pars.
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    rtc Par.R a b -> rtc Par.R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    induction 1; hauto lq:on ctrs:rtc use:Par.renaming.
+  Qed.
+
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    rtc Par.R a b ->
+    rtc Par.R (subst_Tm ρ a) (subst_Tm ρ b).
+  Admitted.
+End Pars.
 
 (***************** Beta rules only ***********************)
 Module RPar.
@@ -831,7 +878,7 @@ Lemma prov_ren n m (ξ : fin n -> fin m) A B a :
   prov A B a -> prov (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
 Proof.
   move : m ξ A B. elim : n / a.
-  - sfirstorder.
+  - sfirstorder rew:db:prov.
   - move => n a ih m ξ A B.
     simp prov. simpl.
     move /ih => {ih}.
@@ -842,19 +889,45 @@ Proof.
   - hauto lq:on rew:db:prov.
   - move => n A0 ih B0 h0 m ξ A B. simpl.
     simp prov.
-    admit.
+    hauto l:on use:Pars.renaming.
   - sfirstorder.
-Admitted.
+Qed.
+
+Lemma prov_morph n m (ρ : fin n -> Tm m) A B a :
+  prov A B a ->
+  prov (subst_Tm ρ A) (subst_Tm (up_Tm_Tm ρ) B) (subst_Tm ρ a).
+Proof.
+  move : m ρ A B. elim : n / a.
+  - hauto q:on rew:db:prov.
+  - move => n a ih m ρ A B.
+    simp prov => /=.
+    move /ih => {ih}.
+    move /(_ _ (up_Tm_Tm ρ)). asimpl.
+    simp prov. by asimpl.
+  - hauto q:on rew:db:prov.
+  - hauto q:on rew:db:prov.
+  - hauto lq:on rew:db:prov.
+  - hauto l:on use:Pars.substing rew:db:prov.
+  - qauto rew:db:prov.
+Qed.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof.
   move => h. elim : n a b /h; qauto ctrs:Par.R.
 Qed.
 
-Lemma prov_par n (A : Tm n) B a b : prov A B a -> EPar.R a b -> prov A B b.
+Lemma prov_par n (A : Tm n) B a b : prov A B a -> Par.R a b -> prov A B b.
 Proof.
   move => + h. move : A B.
   elim : n a b /h.
+  - move => n a0 a1 b0 b1 ha iha hb ihb A B /=.
+    simp prov => h.
+    have : prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a1 by admit.
+    move /(prov_morph _ _ (scons b1 VarTm)).
+    by asimpl.
+  - hauto lq:on rew:db:prov.
+  - hauto lq:on rew:db:prov.
+  - hauto lq:on rew:db:prov.
   - move => n a0 a1 ha iha A B. simp prov. move /iha.
     hauto l:on use:prov_ren.
   - hauto l:on rew:db:prov.
@@ -865,11 +938,9 @@ Proof.
   - hauto lq:on rew:db:prov.
   - move => n A0 A1 B0 B1 hA ihA hB ihB A B. simp prov.
     move => [hA0 hA1].
-    apply EPar_Par in hA, hB.
     eauto using rtc_r.
   - sfirstorder.
-Qed.
-
+Admitted.
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->
