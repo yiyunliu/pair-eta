@@ -1214,7 +1214,51 @@ Module ERPar.
 
   Lemma EPar {n} (a b : Tm n) : EPar.R a b -> R a b.
   Proof. sfirstorder. Qed.
+
+  Lemma refl {n} ( a : Tm n) : ERPar.R a a.
+  Proof.
+    sfirstorder use:RPar.refl, EPar.refl.
+  Qed.
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    R a0 a1 ->
+    R b0 b1 ->
+    rtc R (App a0 b0) (App a1 b1).
+  Proof.
+    move => [] + [].
+    - sfirstorder use:RPar.AppCong, @rtc_once.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.AppCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.AppCong, EPar.refl.
+    - move => h0 h1.
+      apply : rtc_l.
+      left. apply RPar.AppCong; eauto; apply RPar.refl.
+      apply rtc_once.
+      hauto l:on use:EPar.AppCong, EPar.refl.
+    - sfirstorder use:EPar.AppCong, @rtc_once.
+  Qed.
+
 End ERPar.
+
+Hint Resolve ERPar.AppCong ERPar.refl : erpar.
+
+Module ERPars.
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply relations.rtc_transitive; eauto;
+         hauto lq:on db:erpar.
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc ERPar.R a0 a1 ->
+    rtc ERPar.R b0 b1 ->
+    rtc ERPar.R (App a0 b0) (App a1 b1).
+    solve_s.
+  Qed.
+End ERPars.
 
 Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
 Proof.
@@ -1254,7 +1298,7 @@ Proof.
     admit.
   - sfirstorder.
   - admit.
-  - admit.
+  - sfirstorder use:ERPars.AppCong.
   - admit.
   - admit.
   - admit.
