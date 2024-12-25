@@ -1114,11 +1114,6 @@ Proof.
   - qauto rew:db:prov.
 Qed.
 
-Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
-Proof.
-  move => h. elim : n a b /h; qauto ctrs:Par.R.
-Qed.
-
 Lemma prov_par n (A : Tm n) B a b : prov A B a -> Par.R a b -> prov A B b.
 Proof.
   move => + h. move : A B.
@@ -1198,6 +1193,60 @@ Proof.
   move /pi_inv => [A3 [B3 [? [h2 h3]]]].
   exists A2, B2. hauto l:on.
 Qed.
+
+Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
+Proof.
+  move => h. elim : n a b /h; qauto ctrs:Par.R.
+Qed.
+
+Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
+Proof.
+  move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
+Qed.
+
+Module ERPar.
+  Inductive R {n} (a b : Tm n) : Prop :=
+  | RPar : RPar.R a b -> R a b
+  | EPar : EPar.R a b -> R a b.
+End ERPar.
+
+Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
+Proof.
+  sfirstorder inv:ERPar.R use:EPar_Par, RPar_Par.
+Qed.
+
+Lemma Par_ERPar n (a b : Tm n) : Par.R a b -> rtc ERPar.R a b.
+Proof.
+  move => h. elim : n a b /h.
+  - move => n a0 a1 b0 b1 ha iha hb ihb.
+    apply : rtc_l. apply ERPar.RPar.
+    apply RPar.AppAbs; eauto using RPar.refl.
+    (* congruence *)
+    admit.
+  - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc.
+    apply : rtc_l. apply ERPar.RPar.
+    apply RPar.AppPair; eauto using RPar.refl.
+    admit.
+  - move => n p a0 a1 ha iha.
+    apply : rtc_l. apply ERPar.RPar. apply RPar.ProjAbs; eauto using RPar.refl.
+    admit.
+  - move => n p a0 a1 b0 b1 ha iha hb ihb.
+    apply : rtc_l. apply ERPar.RPar. apply RPar.ProjPair; eauto using RPar.refl.
+    admit.
+  - move => n a0 a1 ha iha.
+    apply : rtc_l. apply ERPar.EPar. apply EPar.AppEta; eauto using EPar.refl.
+    admit.
+  - move => n a0 a1 ha iha.
+    apply : rtc_l. apply ERPar.EPar. apply EPar.PairEta; eauto using EPar.refl.
+    admit.
+  - sfirstorder.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - sfirstorder.
+Admitted.
 
 Lemma Par_confluent n (c a1 b1 : Tm n) :
   rtc Par.R c a1 ->
