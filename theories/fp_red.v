@@ -881,7 +881,7 @@ Proof.
 Qed.
 
 Local Ltac prov_tac := sfirstorder use:depth_ren.
-Local Ltac extract_tac := sfirstorder use:depth_subst_bool.
+Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
 
 #[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
