@@ -26,7 +26,8 @@ Inductive Tm (n_Tm : nat) : Type :=
   | Pair : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Proj : PTag -> Tm n_Tm -> Tm n_Tm
   | Pi : Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm
-  | Bot : Tm n_Tm.
+  | Bot : Tm n_Tm
+  | Univ : nat -> Tm n_Tm.
 
 Lemma congr_Abs {m_Tm : nat} {s0 : Tm (S m_Tm)} {t0 : Tm (S m_Tm)}
   (H0 : s0 = t0) : Abs m_Tm s0 = Abs m_Tm t0.
@@ -71,6 +72,12 @@ Proof.
 exact (eq_refl).
 Qed.
 
+Lemma congr_Univ {m_Tm : nat} {s0 : nat} {t0 : nat} (H0 : s0 = t0) :
+  Univ m_Tm s0 = Univ m_Tm t0.
+Proof.
+exact (eq_trans eq_refl (ap (fun x => Univ m_Tm x) H0)).
+Qed.
+
 Lemma upRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n) :
   fin (S m) -> fin (S n).
 Proof.
@@ -93,6 +100,7 @@ Fixpoint ren_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
   | Proj _ s0 s1 => Proj n_Tm s0 (ren_Tm xi_Tm s1)
   | Pi _ s0 s1 => Pi n_Tm (ren_Tm xi_Tm s0) (ren_Tm (upRen_Tm_Tm xi_Tm) s1)
   | Bot _ => Bot n_Tm
+  | Univ _ s0 => Univ n_Tm s0
   end.
 
 Lemma up_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm) :
@@ -119,6 +127,7 @@ Fixpoint subst_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
   | Pi _ s0 s1 =>
       Pi n_Tm (subst_Tm sigma_Tm s0) (subst_Tm (up_Tm_Tm sigma_Tm) s1)
   | Bot _ => Bot n_Tm
+  | Univ _ s0 => Univ n_Tm s0
   end.
 
 Lemma upId_Tm_Tm {m_Tm : nat} (sigma : fin m_Tm -> Tm m_Tm)
@@ -158,6 +167,7 @@ subst_Tm sigma_Tm s = s :=
       congr_Pi (idSubst_Tm sigma_Tm Eq_Tm s0)
         (idSubst_Tm (up_Tm_Tm sigma_Tm) (upId_Tm_Tm _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma upExtRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n)
@@ -201,6 +211,7 @@ Fixpoint extRen_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
         (extRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
            (upExtRen_Tm_Tm _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma upExt_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm)
@@ -245,6 +256,7 @@ Fixpoint ext_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
         (ext_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm) (upExt_Tm_Tm _ _ Eq_Tm)
            s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma up_ren_ren_Tm_Tm {k : nat} {l : nat} {m : nat} (xi : fin k -> fin l)
@@ -289,6 +301,7 @@ Fixpoint compRenRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
         (compRenRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
            (upRen_Tm_Tm rho_Tm) (up_ren_ren _ _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma up_ren_subst_Tm_Tm {k : nat} {l : nat} {m_Tm : nat}
@@ -343,6 +356,7 @@ Fixpoint compRenSubst_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
         (compRenSubst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm tau_Tm)
            (up_Tm_Tm theta_Tm) (up_ren_subst_Tm_Tm _ _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma up_subst_ren_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -418,6 +432,7 @@ ren_Tm zeta_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
         (compSubstRen_Tm (up_Tm_Tm sigma_Tm) (upRen_Tm_Tm zeta_Tm)
            (up_Tm_Tm theta_Tm) (up_subst_ren_Tm_Tm _ _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma up_subst_subst_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -494,6 +509,7 @@ subst_Tm tau_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
         (compSubstSubst_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm)
            (up_Tm_Tm theta_Tm) (up_subst_subst_Tm_Tm _ _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma renRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
@@ -609,6 +625,7 @@ Fixpoint rinst_inst_Tm {m_Tm : nat} {n_Tm : nat}
         (rinst_inst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm sigma_Tm)
            (rinstInst_up_Tm_Tm _ _ Eq_Tm) s1)
   | Bot _ => congr_Bot
+  | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
 
 Lemma rinstInst'_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
@@ -806,6 +823,8 @@ Import
 Core.
 
 Arguments VarTm {n_Tm}.
+
+Arguments Univ {n_Tm}.
 
 Arguments Bot {n_Tm}.
 

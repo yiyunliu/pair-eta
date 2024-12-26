@@ -74,7 +74,9 @@ Module Par.
     R (Pi A0 B0) (Pi A1 B1)
   (* Bot is useful for making the prov function computable  *)
   | BotCong :
-    R Bot Bot.
+    R Bot Bot
+  | UnivCong i :
+    R (Univ i) (Univ i).
 
   Lemma refl n (a : Tm n) : R a a.
     elim : n /a; hauto ctrs:R.
@@ -134,6 +136,7 @@ Module Par.
     - qauto l:on ctrs:R.
     - qauto l:on ctrs:R.
     - hauto l:on inv:option ctrs:R use:renaming.
+    - sfirstorder.
     - sfirstorder.
   Qed.
 
@@ -212,7 +215,8 @@ Module Par.
       move : ihB => [c0 [? ?]]. subst.
       eexists. split. by apply PiCong; eauto.
       by asimpl.
-    - hauto lq:on rew:off inv:Tm.
+    - move => n n0 ξ []//=. hauto l:on.
+    - move => n i n0 ξ []//=. hauto l:on.
   Qed.
 
 End Par.
@@ -287,7 +291,9 @@ Module RPar.
     R B0 B1 ->
     R (Pi A0 B0) (Pi A1 B1)
   | BotCong :
-    R Bot Bot.
+    R Bot Bot
+  | UnivCong i :
+    R (Univ i) (Univ i).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -354,6 +360,7 @@ Module RPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
   Qed.
 
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
@@ -402,7 +409,9 @@ Module EPar.
     R B0 B1 ->
     R (Pi A0 B0) (Pi A1 B1)
   | BotCong :
-    R Bot Bot.
+    R Bot Bot
+  | UnivCong i :
+    R (Univ i) (Univ i).
 
   Lemma refl n (a : Tm n) : EPar.R a a.
   Proof.
@@ -445,6 +454,7 @@ Module EPar.
     - hauto q:on ctrs:R.
     - hauto q:on ctrs:R.
     - hauto l:on ctrs:R use:renaming inv:option.
+    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
   Qed.
 
@@ -746,6 +756,7 @@ Proof.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
   - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.PiCong.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
+  - hauto l:on ctrs:EPar.R inv:RPar.R.
 Qed.
 
 Lemma commutativity1 n (a b0 b1 : Tm n) :
@@ -859,6 +870,20 @@ Lemma Bot_EPar' n (u : Tm n) :
   - hauto l:on ctrs:OExp.R.
 Qed.
 
+Lemma Univ_EPar' n i (u : Tm n) :
+  EPar.R (Univ i) u ->
+  rtc OExp.R (Univ i) u.
+  move E : (Univ i) => t h.
+  move : E. elim : n t u /h => //=.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
 Lemma EPar_diamond n (c a1 b1 : Tm n) :
   EPar.R c a1 ->
   EPar.R c b1 ->
@@ -907,6 +932,7 @@ Proof.
     move => [d h].
     exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
   - qauto use:Bot_EPar', EPar.refl.
+  - qauto use:Univ_EPar', EPar.refl.
 Qed.
 
 Function tstar {n} (a : Tm n) :=
@@ -923,6 +949,7 @@ Function tstar {n} (a : Tm n) :=
   | Proj p a => Proj p (tstar a)
   | Pi a b => Pi (tstar a) (tstar b)
   | Bot => Bot
+  | Univ i => Univ i
   end.
 
 Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
@@ -936,6 +963,7 @@ Proof.
   - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
   - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+  - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
@@ -973,6 +1001,7 @@ Fixpoint depth_tm {n} (a : Tm n) :=
   | Proj p a => 1 + depth_tm a
   | Pair a b => 1 + max (depth_tm a) (depth_tm b)
   | Bot => 1
+  | Univ i => 1
   end.
 
 Lemma depth_ren n m (ξ: fin n -> fin m) a :
@@ -1007,6 +1036,7 @@ Proof.
       by rewrite -depth_ren.
     + by simpl.
   - sfirstorder.
+  - sfirstorder.
 Qed.
 
 Lemma depth_subst_bool n (a : Tm (S n)) :
@@ -1019,6 +1049,7 @@ Qed.
 Local Ltac prov_tac := sfirstorder use:depth_ren.
 Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
 
+(* Can consider combine prov and provU *)
 #[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
   prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a;
@@ -1026,7 +1057,18 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   prov A B (Pair a b) := prov A B a /\ prov A B b;
   prov A B (Proj p a) := prov A B a;
   prov A B Bot := False;
-  prov A B (VarTm _) := False.
+  prov A B (VarTm _) := False;
+  prov A B (Univ _) := False .
+
+#[tactic="prov_tac"]Equations provU {n} (i : nat) (a : Tm n) : Prop by wf (depth_tm a) lt :=
+  provU i (Pi A0 B0) := False;
+  provU i (Abs a) := provU i a;
+  provU i (App a b) := provU i a;
+  provU i (Pair a b) := provU i a /\ provU i b;
+  provU i (Proj p a) := provU i a;
+  provU i Bot := False;
+  provU i (VarTm _) := False;
+  provU i (Univ j) := i = j.
 
 #[tactic="prov_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (Pi A B) := Pi A B;
@@ -1035,7 +1077,9 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   extract (Pair a b) := extract a;
   extract (Proj p a) := extract a;
   extract Bot := Bot;
-  extract (VarTm _) := Bot.
+  extract (VarTm i) := (VarTm i);
+  extract (Univ i) := Univ i.
+
 
 Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
   extract (ren_Tm ξ a) = ren_Tm ξ (extract a).
@@ -1050,6 +1094,7 @@ Proof.
   - hauto q:on rew:db:extract.
   - hauto q:on rew:db:extract.
   - hauto q:on rew:db:extract.
+  - sfirstorder.
   - sfirstorder.
 Qed.
 
@@ -1084,6 +1129,26 @@ Proof.
     simp prov.
     hauto l:on use:Pars.renaming.
   - sfirstorder.
+  - sfirstorder.
+Qed.
+
+Lemma provU_ren n m (ξ : fin n -> fin m) i a :
+  provU i a -> provU i (ren_Tm ξ a).
+Proof.
+  move : m ξ i. elim : n / a.
+  - sfirstorder rew:db:prov.
+  - move => n a ih m ξ i.
+    simp provU =>/=.
+    move /ih => {ih}.
+    move /(_ _ (upRen_Tm_Tm ξ)).
+    simp provU.
+  - hauto q:on rew:db:provU.
+  - qauto l:on rew:db:provU.
+  - hauto lq:on rew:db:provU.
+  - move => n A0 ih B0 h0 m ξ i /=.
+    simp prov.
+  - sfirstorder.
+  - sfirstorder.
 Qed.
 
 Lemma prov_morph n m (ρ : fin n -> Tm m) A B a :
@@ -1102,8 +1167,27 @@ Proof.
   - hauto lq:on rew:db:prov.
   - hauto l:on use:Pars.substing rew:db:prov.
   - qauto rew:db:prov.
+  - qauto rew:db:prov.
 Qed.
 
+Lemma provU_morph n m (ρ : fin n -> Tm m) i a :
+  provU i a ->
+  provU i (subst_Tm ρ a).
+Proof.
+  move : m ρ i. elim : n / a.
+  - hauto q:on rew:db:provU.
+  - move => n a ih m ρ i.
+    simp provU => /=.
+    move /ih => {ih}.
+    move /(_ _ (up_Tm_Tm ρ)). asimpl.
+    simp provU.
+  - hauto q:on rew:db:provU.
+  - hauto q:on rew:db:provU.
+  - hauto lq:on rew:db:provU.
+  - hauto l:on use:Pars.substing rew:db:provU.
+  - qauto rew:db:provU.
+  - qauto rew:db:provU.
+Qed.
 
 Lemma prov_par n (A : Tm n) B a b : prov A B a -> Par.R a b -> prov A B b.
 Proof.
@@ -1129,11 +1213,42 @@ Proof.
     move => [hA0 hA1].
     eauto using rtc_r.
   - sfirstorder.
+  - sfirstorder.
+Qed.
+
+Lemma provU_par n i (a b : Tm n) : provU i a -> Par.R a b -> provU i b.
+Proof.
+  move => + h. move : i.
+  elim : n a b /h.
+  - move => n a0 a1 b0 b1 ha iha hb ihb i /=.
+    simp provU => h.
+    move /iha : h.
+    move /(provU_morph _ _ (scons b1 VarTm)).
+    by asimpl.
+  - hauto lq:on rew:db:provU.
+  - hauto lq:on rew:db:provU.
+  - hauto lq:on rew:db:provU.
+  - move => n a0 a1 ha iha i. simp provU. move /iha.
+    hauto l:on use:provU_ren.
+  - hauto l:on rew:db:provU.
+  - simp provU.
+  - move => n a0 a1 ha iha i. simp provU.
+  - hauto l:on rew:db:provU.
+  - hauto l:on rew:db:provU.
+  - hauto lq:on rew:db:provU.
+  - move => n A0 A1 B0 B1 hA ihA hB ihB i. simp provU.
+  - sfirstorder.
+  - sfirstorder.
 Qed.
 
 Lemma prov_pars n (A : Tm n) B a b : prov A B a -> rtc Par.R a b -> prov A B b.
 Proof.
   induction 2; hauto lq:on use:prov_par.
+Qed.
+
+Lemma provU_pars n i (a : Tm n) b : provU i a -> rtc Par.R a b -> provU i b.
+Proof.
+  induction 2; hauto lq:on use:provU_par.
 Qed.
 
 Lemma prov_extract n A B (a : Tm n) :
@@ -1162,6 +1277,26 @@ Proof.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
   - qauto l:on rew:db:prov, extract.
+Qed.
+
+Lemma provU_extract n i (a : Tm n) :
+  provU i a -> extract a = Univ i.
+Proof.
+  move : i. elim : n / a => //=.
+  - move => n a ih i.
+    simp provU.
+    move /ih.
+    simp extract.
+    move => h.
+    (* anti renaming for par *)
+    have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
+    subst_Tm (scons Bot VarTm) (ren_Tm shift (Univ i)) by sauto lq:on.
+    move : h0. asimpl. move => ->.
+    hauto lq:on.
+  - hauto l:on rew:db:provU, extract.
+  - hauto l:on rew:db:provU, extract.
+  - hauto l:on rew:db:provU, extract.
+  - qauto l:on rew:db:provU, extract.
 Qed.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
@@ -1379,6 +1514,7 @@ Proof.
   - sfirstorder use:ERPars.ProjCong.
   - sfirstorder use:ERPars.PiCong.
   - sfirstorder.
+  - sfirstorder.
 Qed.
 
 Lemma Pars_ERPar n (a b : Tm n) : rtc Par.R a b -> rtc ERPar.R a b.
@@ -1550,6 +1686,15 @@ Proof. sfirstorder unfold:join. Qed.
 Lemma join_refl n (a : Tm n) : join a a.
 Proof. hauto lq:on ctrs:rtc unfold:join. Qed.
 
+Lemma pars_univ_inv n i (c : Tm n) :
+  rtc Par.R (Univ i) c ->
+  extract c = Univ i.
+Proof.
+  have : provU i (Univ i : Tm n) by sfirstorder.
+  move : provU_pars. repeat move/[apply].
+  by move/provU_extract.
+Qed.
+
 Lemma pars_pi_inv n (A : Tm n) B C :
   rtc Par.R (Pi A B) C ->
   exists A0 B0, extract C = Pi A0 B0 /\
@@ -1558,6 +1703,14 @@ Proof.
   have : prov A B (Pi A B) by sfirstorder.
   move : prov_pars. repeat move/[apply].
   by move /prov_extract.
+Qed.
+
+Lemma pars_univ_inj n i j (C : Tm n) :
+  rtc Par.R (Univ i) C ->
+  rtc Par.R (Univ j) C ->
+  i = j.
+Proof.
+  sauto l:on use:pars_univ_inv.
 Qed.
 
 Lemma pars_pi_inj n (A0 A1 : Tm n) B0 B1 C :
@@ -1571,6 +1724,12 @@ Proof.
   exists A2, B2. hauto l:on.
 Qed.
 
+Lemma join_univ_inj n i j (C : Tm n) :
+  join (Univ i : Tm n) (Univ j) -> i = j.
+Proof.
+  sfirstorder use:pars_univ_inj.
+Qed.
+
 Lemma join_pi_inj n (A0 A1 : Tm n) B0 B1 :
   join (Pi A0 B0) (Pi A1 B1) ->
   join A0 A1 /\ join B0 B1.
@@ -1578,4 +1737,14 @@ Proof.
   move => [c []].
   move : pars_pi_inj; repeat move/[apply].
   sfirstorder unfold:join.
+Qed.
+
+Lemma join_univ_pi_contra n (A : Tm n) B i :
+  join (Pi A B) (Univ i) -> False.
+Proof.
+  rewrite /join.
+  move => [c [h0 h1]].
+  move /pars_univ_inv : h1.
+  move /pars_pi_inv : h0.
+  hauto l:on.
 Qed.

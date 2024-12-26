@@ -1,3 +1,4 @@
+nat  : Type
 Tm(VarTm) : Type
 PTag : Type
 
@@ -9,3 +10,4 @@ Pair : Tm -> Tm -> Tm
 Proj : PTag -> Tm -> Tm
 Pi : Tm -> (bind Tm in Tm) -> Tm
 Bot : Tm
+Univ : nat -> Tm
