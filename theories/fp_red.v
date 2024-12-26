@@ -10,6 +10,8 @@ From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
 From Equations Require Import Equations.
 
+Unset Equations With Funext.
+
 Ltac2 spec_refl () :=
   List.iter
     (fun a => match a with
@@ -1039,7 +1041,8 @@ Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
 Proof.
   move : m ξ. elim : n/a.
   - sfirstorder.
-  - move => n a ih m ξ. simpl. simp extract.
+  - move => n a ih m ξ. simpl.
+    simp extract.
     rewrite ih.
     by asimpl.
   - hauto q:on rew:db:extract.
@@ -1099,6 +1102,7 @@ Proof.
   - hauto l:on use:Pars.substing rew:db:prov.
   - qauto rew:db:prov.
 Qed.
+
 
 Lemma prov_par n (A : Tm n) B a b : prov A B a -> Par.R a b -> prov A B b.
 Proof.
