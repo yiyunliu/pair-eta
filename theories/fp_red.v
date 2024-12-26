@@ -72,6 +72,7 @@ Module Par.
     R A0 A1 ->
     R B0 B1 ->
     R (Pi A0 B0) (Pi A1 B1)
+  (* Bot is useful for making the prov function computable  *)
   | BotCong :
     R Bot Bot.
 
@@ -1163,27 +1164,6 @@ Proof.
   - qauto l:on rew:db:prov, extract.
 Qed.
 
-Lemma pi_inv n (A : Tm n) B C :
-  rtc Par.R (Pi A B) C ->
-  exists A0 B0, extract C = Pi A0 B0 /\
-             rtc Par.R A A0 /\ rtc Par.R B B0.
-Proof.
-  have : prov A B (Pi A B) by sfirstorder.
-  move : prov_pars. repeat move/[apply].
-  by move /prov_extract.
-Qed.
-
-Lemma pi_inj n (A0 A1 : Tm n) B0 B1 C :
-  rtc Par.R (Pi A0 B0) C ->
-  rtc Par.R (Pi A1 B1) C ->
-  exists A2 B2, rtc Par.R A0 A2 /\ rtc Par.R A1 A2 /\
-             rtc Par.R B0 B2 /\ rtc Par.R B1 B2.
-Proof.
-  move /pi_inv => [A2 [B2 [? [h0 h1]]]].
-  move /pi_inv => [A3 [B3 [? [h2 h3]]]].
-  exists A2, B2. hauto l:on.
-Qed.
-
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof.
   move => h. elim : n a b /h; qauto ctrs:Par.R.
@@ -1548,4 +1528,54 @@ Proof.
   move /rtc_union => + /rtc_union.
   move : h; repeat move/[apply].
   hauto lq:on use:rtc_union.
+Qed.
+
+Definition join {n} (a b : Tm n) :=
+  exists c, rtc Par.R a c /\ rtc Par.R b c.
+
+Lemma join_transitive n (a b c : Tm n) :
+  join a b -> join b c -> join a c.
+Proof.
+  rewrite /join.
+  move => [ab [h0 h1]] [bc [h2 h3]].
+  move : Par_confluent h1 h2; repeat move/[apply].
+  move => [abc [h4 h5]].
+  eauto using relations.rtc_transitive.
+Qed.
+
+Lemma join_symmetric n (a b : Tm n) :
+  join a b -> join b a.
+Proof. sfirstorder unfold:join. Qed.
+
+Lemma join_refl n (a : Tm n) : join a a.
+Proof. hauto lq:on ctrs:rtc unfold:join. Qed.
+
+Lemma pars_pi_inv n (A : Tm n) B C :
+  rtc Par.R (Pi A B) C ->
+  exists A0 B0, extract C = Pi A0 B0 /\
+             rtc Par.R A A0 /\ rtc Par.R B B0.
+Proof.
+  have : prov A B (Pi A B) by sfirstorder.
+  move : prov_pars. repeat move/[apply].
+  by move /prov_extract.
+Qed.
+
+Lemma pars_pi_inj n (A0 A1 : Tm n) B0 B1 C :
+  rtc Par.R (Pi A0 B0) C ->
+  rtc Par.R (Pi A1 B1) C ->
+  exists A2 B2, rtc Par.R A0 A2 /\ rtc Par.R A1 A2 /\
+             rtc Par.R B0 B2 /\ rtc Par.R B1 B2.
+Proof.
+  move /pars_pi_inv => [A2 [B2 [? [h0 h1]]]].
+  move /pars_pi_inv => [A3 [B3 [? [h2 h3]]]].
+  exists A2, B2. hauto l:on.
+Qed.
+
+Lemma join_pi_inj n (A0 A1 : Tm n) B0 B1 :
+  join (Pi A0 B0) (Pi A1 B1) ->
+  join A0 A1 /\ join B0 B1.
+Proof.
+  move => [c []].
+  move : pars_pi_inj; repeat move/[apply].
+  sfirstorder unfold:join.
 Qed.
