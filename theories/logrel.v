@@ -2,7 +2,7 @@ Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
 Require Import fp_red.
 From Hammer Require Import Tactics.
 From Equations Require Import Equations.
-Require Import ssreflect.
+Require Import ssreflect ssrbool.
 Require Import Logic.PropExtensionality (propositional_extensionality).
 From stdpp Require Import relations (rtc(..)).
 Definition ProdSpace {n} (PA : Tm n -> Prop)
@@ -178,3 +178,51 @@ Lemma InterpUnivN_back_preservation_star n i (A : Tm n) B P (h : ⟦ B ⟧ i ↘
   rtc RPar.R A B ->
   ⟦ A ⟧ i ↘ P.
 Proof. hauto l:on rew:db:InterpUnivN use:InterpExt_back_preservation_star. Qed.
+
+Definition ty_hf {n} (a : Tm n) :=
+  match a with
+  | Pi _ _ => true
+  | Univ _ => true
+  | _ => false
+  end.
+
+Lemma InterpExtInv n i I (A : Tm n) PA :
+  ⟦ A ⟧ i ;; I ↘ PA ->
+  exists B, ty_hf B /\ rtc RPar.R A B /\  ⟦ B ⟧ i ;; I ↘ PA.
+Proof.
+  move => h. elim : A PA /h.
+  - move => A B PA PF hPA _ hPF hPF0 _.
+    exists (Pi A B). repeat split => //=.
+    apply rtc_refl.
+    hauto l:on ctrs:InterpExt.
+  - move => j ?. exists (Univ j).
+    hauto l:on ctrs:InterpExt.
+  - hauto lq:on ctrs:rtc.
+Qed.
+
+Lemma InterpExt_Join n i I (A B : Tm n) PA PB :
+  ⟦ A ⟧ i ;; I ↘ PA ->
+  ⟦ B ⟧ i ;; I ↘ PB ->
+  join A B ->
+  PA = PB.
+Proof.
+  move => h. move : B PB. elim : A PA /h.
+  - move => A B PA PF hPA ihPA hTot hRes ihPF U PU /InterpExtInv.
+    move => [B0 []].
+    case : B0 => //=.
+    + move => A0 B0 _ [hr hPi].
+      move /InterpExt_Fun_inv : hPi.
+      move => [PA0][PF0][hPA0][hTot0][hRes0]?. subst.
+      move => hjoin.
+      have ? : join A A0 by admit.
+      have ? : join B B0 by admit.
+      have ? : PA0 = PA by hauto l:on. subst.
+      rewrite /ProdSpace.
+      extensionality b.
+      apply propositional_extensionality.
+      admit.
+    (* Contradiction *)
+    + admit.
+  - admit.
+  - admit.
+Admitted.
