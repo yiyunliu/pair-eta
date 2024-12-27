@@ -68,10 +68,10 @@ Module Par.
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | PiCong A0 A1 B0 B1:
+  | BindCong p A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1)
+    R (TBind p A0 B0) (TBind p A1 B1)
   (* Bot is useful for making the prov function computable  *)
   | BotCong :
     R Bot Bot
@@ -209,11 +209,11 @@ Module Par.
       move : iha => [b0 [? ?]]. subst.
       eexists. split. by apply ProjCong; eauto.
       by asimpl.
-    - move => n A0 A1 B0 B1 ha iha hB ihB m ξ []//= t t0 [*]. subst.
+    - move => n p A0 A1 B0 B1 ha iha hB ihB m ξ []//= ? t t0 [*]. subst.
       spec_refl.
       move : iha => [b0 [? ?]].
       move : ihB => [c0 [? ?]]. subst.
-      eexists. split. by apply PiCong; eauto.
+      eexists. split. by apply BindCong; eauto.
       by asimpl.
     - move => n n0 ξ []//=. hauto l:on.
     - move => n i n0 ξ []//=. hauto l:on.
@@ -286,7 +286,7 @@ Module RPar.
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | PiCong A0 A1 B0 B1:
+  | BindCong A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
     R (Pi A0 B0) (Pi A1 B1)
@@ -404,7 +404,7 @@ Module EPar.
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | PiCong A0 A1 B0 B1:
+  | BindCong A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
     R (Pi A0 B0) (Pi A1 B1)
@@ -533,7 +533,7 @@ Module RPars.
     rtc RPar.R (App a0 b0) (App a1 b1).
   Proof. solve_s. Qed.
 
-  Lemma PiCong n (a0 a1 : Tm n) b0 b1 :
+  Lemma BindCong n (a0 a1 : Tm n) b0 b1 :
     rtc RPar.R a0 a1 ->
     rtc RPar.R b0 b1 ->
     rtc RPar.R (Pi a0 b0) (Pi a1 b1).
@@ -754,7 +754,7 @@ Proof.
       exists d. split => //.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
-  - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.PiCong.
+  - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.BindCong.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
 Qed.
@@ -927,7 +927,7 @@ Proof.
   - move => n a0 a1 b0 b1 ha iha hb ihb c.
     move /Pi_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
     have : EPar.R (Pi a2 b2)(Pi a3 b3)
-      by hauto l:on use:EPar.PiCong.
+      by hauto l:on use:EPar.BindCong.
     move : OExp.commutativity0 h2; repeat move/[apply].
     move => [d h].
     exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
@@ -1375,24 +1375,24 @@ Module ERPar.
     - sfirstorder use:EPar.AppCong, @rtc_once.
   Qed.
 
-  Lemma PiCong n (a0 a1 : Tm n) b0 b1:
+  Lemma BindCong n (a0 a1 : Tm n) b0 b1:
     R a0 a1 ->
     R b0 b1 ->
     rtc R (Pi a0 b0) (Pi a1 b1).
   Proof.
     move => [] + [].
-    - sfirstorder use:RPar.PiCong, @rtc_once.
+    - sfirstorder use:RPar.BindCong, @rtc_once.
     - move => h0 h1.
       apply : rtc_l.
-      left. apply RPar.PiCong; eauto; apply RPar.refl.
+      left. apply RPar.BindCong; eauto; apply RPar.refl.
       apply rtc_once.
-      hauto l:on use:EPar.PiCong, EPar.refl.
+      hauto l:on use:EPar.BindCong, EPar.refl.
     - move => h0 h1.
       apply : rtc_l.
-      left. apply RPar.PiCong; eauto; apply RPar.refl.
+      left. apply RPar.BindCong; eauto; apply RPar.refl.
       apply rtc_once.
-      hauto l:on use:EPar.PiCong, EPar.refl.
-    - sfirstorder use:EPar.PiCong, @rtc_once.
+      hauto l:on use:EPar.BindCong, EPar.refl.
+    - sfirstorder use:EPar.BindCong, @rtc_once.
   Qed.
 
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
@@ -1423,7 +1423,7 @@ Module ERPar.
 
 End ERPar.
 
-Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong ERPar.ProjCong ERPar.PiCong : erpar.
+Hint Resolve ERPar.AppCong ERPar.refl ERPar.AbsCong ERPar.PairCong ERPar.ProjCong ERPar.BindCong : erpar.
 
 Module ERPars.
   #[local]Ltac solve_s_rec :=
@@ -1454,7 +1454,7 @@ Module ERPars.
     rtc ERPar.R (Proj p a0) (Proj p a1).
   Proof. solve_s. Qed.
 
-  Lemma PiCong n (a0 a1 : Tm n) b0 b1:
+  Lemma BindCong n (a0 a1 : Tm n) b0 b1:
     rtc ERPar.R a0 a1 ->
     rtc ERPar.R b0 b1 ->
     rtc ERPar.R (Pi a0 b0) (Pi a1 b1).
@@ -1512,7 +1512,7 @@ Proof.
   - sfirstorder use:ERPars.AppCong.
   - sfirstorder use:ERPars.PairCong.
   - sfirstorder use:ERPars.ProjCong.
-  - sfirstorder use:ERPars.PiCong.
+  - sfirstorder use:ERPars.BindCong.
   - sfirstorder.
   - sfirstorder.
 Qed.

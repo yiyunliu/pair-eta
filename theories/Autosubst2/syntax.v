@@ -19,13 +19,27 @@ Proof.
 exact (eq_refl).
 Qed.
 
+Inductive TTag : Type :=
+  | TPi : TTag
+  | TSig : TTag.
+
+Lemma congr_TPi : TPi = TPi.
+Proof.
+exact (eq_refl).
+Qed.
+
+Lemma congr_TSig : TSig = TSig.
+Proof.
+exact (eq_refl).
+Qed.
+
 Inductive Tm (n_Tm : nat) : Type :=
   | VarTm : fin n_Tm -> Tm n_Tm
   | Abs : Tm (S n_Tm) -> Tm n_Tm
   | App : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Pair : Tm n_Tm -> Tm n_Tm -> Tm n_Tm
   | Proj : PTag -> Tm n_Tm -> Tm n_Tm
-  | Pi : Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm
+  | TBind : TTag -> Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm
   | Bot : Tm n_Tm
   | Univ : nat -> Tm n_Tm.
 
@@ -59,12 +73,14 @@ exact (eq_trans (eq_trans eq_refl (ap (fun x => Proj m_Tm x s1) H0))
          (ap (fun x => Proj m_Tm t0 x) H1)).
 Qed.
 
-Lemma congr_Pi {m_Tm : nat} {s0 : Tm m_Tm} {s1 : Tm (S m_Tm)} {t0 : Tm m_Tm}
-  {t1 : Tm (S m_Tm)} (H0 : s0 = t0) (H1 : s1 = t1) :
-  Pi m_Tm s0 s1 = Pi m_Tm t0 t1.
+Lemma congr_TBind {m_Tm : nat} {s0 : TTag} {s1 : Tm m_Tm} {s2 : Tm (S m_Tm)}
+  {t0 : TTag} {t1 : Tm m_Tm} {t2 : Tm (S m_Tm)} (H0 : s0 = t0) (H1 : s1 = t1)
+  (H2 : s2 = t2) : TBind m_Tm s0 s1 s2 = TBind m_Tm t0 t1 t2.
 Proof.
-exact (eq_trans (eq_trans eq_refl (ap (fun x => Pi m_Tm x s1) H0))
-         (ap (fun x => Pi m_Tm t0 x) H1)).
+exact (eq_trans
+         (eq_trans (eq_trans eq_refl (ap (fun x => TBind m_Tm x s1 s2) H0))
+            (ap (fun x => TBind m_Tm t0 x s2) H1))
+         (ap (fun x => TBind m_Tm t0 t1 x) H2)).
 Qed.
 
 Lemma congr_Bot {m_Tm : nat} : Bot m_Tm = Bot m_Tm.
@@ -98,7 +114,8 @@ Fixpoint ren_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
   | App _ s0 s1 => App n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1)
   | Pair _ s0 s1 => Pair n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1)
   | Proj _ s0 s1 => Proj n_Tm s0 (ren_Tm xi_Tm s1)
-  | Pi _ s0 s1 => Pi n_Tm (ren_Tm xi_Tm s0) (ren_Tm (upRen_Tm_Tm xi_Tm) s1)
+  | TBind _ s0 s1 s2 =>
+      TBind n_Tm s0 (ren_Tm xi_Tm s1) (ren_Tm (upRen_Tm_Tm xi_Tm) s2)
   | Bot _ => Bot n_Tm
   | Univ _ s0 => Univ n_Tm s0
   end.
@@ -124,8 +141,8 @@ Fixpoint subst_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
   | App _ s0 s1 => App n_Tm (subst_Tm sigma_Tm s0) (subst_Tm sigma_Tm s1)
   | Pair _ s0 s1 => Pair n_Tm (subst_Tm sigma_Tm s0) (subst_Tm sigma_Tm s1)
   | Proj _ s0 s1 => Proj n_Tm s0 (subst_Tm sigma_Tm s1)
-  | Pi _ s0 s1 =>
-      Pi n_Tm (subst_Tm sigma_Tm s0) (subst_Tm (up_Tm_Tm sigma_Tm) s1)
+  | TBind _ s0 s1 s2 =>
+      TBind n_Tm s0 (subst_Tm sigma_Tm s1) (subst_Tm (up_Tm_Tm sigma_Tm) s2)
   | Bot _ => Bot n_Tm
   | Univ _ s0 => Univ n_Tm s0
   end.
@@ -163,9 +180,9 @@ subst_Tm sigma_Tm s = s :=
       congr_Pair (idSubst_Tm sigma_Tm Eq_Tm s0)
         (idSubst_Tm sigma_Tm Eq_Tm s1)
   | Proj _ s0 s1 => congr_Proj (eq_refl s0) (idSubst_Tm sigma_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (idSubst_Tm sigma_Tm Eq_Tm s0)
-        (idSubst_Tm (up_Tm_Tm sigma_Tm) (upId_Tm_Tm _ Eq_Tm) s1)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0) (idSubst_Tm sigma_Tm Eq_Tm s1)
+        (idSubst_Tm (up_Tm_Tm sigma_Tm) (upId_Tm_Tm _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -206,10 +223,10 @@ Fixpoint extRen_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
         (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1)
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0) (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0) (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1)
         (extRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
-           (upExtRen_Tm_Tm _ _ Eq_Tm) s1)
+           (upExtRen_Tm_Tm _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -251,10 +268,10 @@ Fixpoint ext_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
       congr_Pair (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
         (ext_Tm sigma_Tm tau_Tm Eq_Tm s1)
   | Proj _ s0 s1 => congr_Proj (eq_refl s0) (ext_Tm sigma_Tm tau_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0) (ext_Tm sigma_Tm tau_Tm Eq_Tm s1)
         (ext_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm) (upExt_Tm_Tm _ _ Eq_Tm)
-           s1)
+           s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -296,10 +313,10 @@ Fixpoint compRenRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
         (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0) (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0) (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
         (compRenRen_Tm (upRen_Tm_Tm xi_Tm) (upRen_Tm_Tm zeta_Tm)
-           (upRen_Tm_Tm rho_Tm) (up_ren_ren _ _ _ Eq_Tm) s1)
+           (upRen_Tm_Tm rho_Tm) (up_ren_ren _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -351,10 +368,11 @@ Fixpoint compRenSubst_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0)
         (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0)
+        (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s1)
         (compRenSubst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm tau_Tm)
-           (up_Tm_Tm theta_Tm) (up_ren_subst_Tm_Tm _ _ _ Eq_Tm) s1)
+           (up_Tm_Tm theta_Tm) (up_ren_subst_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -427,10 +445,11 @@ ren_Tm zeta_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0)
         (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0)
+        (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s1)
         (compSubstRen_Tm (up_Tm_Tm sigma_Tm) (upRen_Tm_Tm zeta_Tm)
-           (up_Tm_Tm theta_Tm) (up_subst_ren_Tm_Tm _ _ _ Eq_Tm) s1)
+           (up_Tm_Tm theta_Tm) (up_subst_ren_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -504,10 +523,11 @@ subst_Tm tau_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0)
         (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0)
+        (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s1)
         (compSubstSubst_Tm (up_Tm_Tm sigma_Tm) (up_Tm_Tm tau_Tm)
-           (up_Tm_Tm theta_Tm) (up_subst_subst_Tm_Tm _ _ _ Eq_Tm) s1)
+           (up_Tm_Tm theta_Tm) (up_subst_subst_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -620,10 +640,10 @@ Fixpoint rinst_inst_Tm {m_Tm : nat} {n_Tm : nat}
         (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
   | Proj _ s0 s1 =>
       congr_Proj (eq_refl s0) (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
-  | Pi _ s0 s1 =>
-      congr_Pi (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
+  | TBind _ s0 s1 s2 =>
+      congr_TBind (eq_refl s0) (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
         (rinst_inst_Tm (upRen_Tm_Tm xi_Tm) (up_Tm_Tm sigma_Tm)
-           (rinstInst_up_Tm_Tm _ _ Eq_Tm) s1)
+           (rinstInst_up_Tm_Tm _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
   end.
@@ -828,7 +848,7 @@ Arguments Univ {n_Tm}.
 
 Arguments Bot {n_Tm}.
 
-Arguments Pi {n_Tm}.
+Arguments TBind {n_Tm}.
 
 Arguments Proj {n_Tm}.
 
