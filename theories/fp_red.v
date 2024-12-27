@@ -286,10 +286,10 @@ Module RPar.
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | BindCong A0 A1 B0 B1:
+  | BindCong p A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1)
+    R (TBind p A0 B0) (TBind p A1 B1)
   | BotCong :
     R Bot Bot
   | UnivCong i :
@@ -404,10 +404,10 @@ Module EPar.
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | BindCong A0 A1 B0 B1:
+  | BindCong p A0 A1 B0 B1:
     R A0 A1 ->
     R B0 B1 ->
-    R (Pi A0 B0) (Pi A1 B1)
+    R (TBind p A0 B0) (TBind p A1 B1)
   | BotCong :
     R Bot Bot
   | UnivCong i :
