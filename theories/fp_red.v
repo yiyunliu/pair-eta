@@ -533,10 +533,10 @@ Module RPars.
     rtc RPar.R (App a0 b0) (App a1 b1).
   Proof. solve_s. Qed.
 
-  Lemma BindCong n (a0 a1 : Tm n) b0 b1 :
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1 :
     rtc RPar.R a0 a1 ->
     rtc RPar.R b0 b1 ->
-    rtc RPar.R (Pi a0 b0) (Pi a1 b1).
+    rtc RPar.R (TBind p a0 b0) (TBind p a1 b1).
   Proof. solve_s. Qed.
 
   Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
@@ -826,11 +826,11 @@ Proof.
   - hauto l:on ctrs:OExp.R.
 Qed.
 
-Lemma Pi_EPar' n (a : Tm n) b u  :
-  EPar.R (Pi a b) u ->
-  (exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (Pi a0 b0) u).
+Lemma Bind_EPar' n p (a : Tm n) b u  :
+  EPar.R (TBind p a b) u ->
+  (exists a0 b0, EPar.R a a0 /\ EPar.R b b0 /\ rtc OExp.R (TBind p a0 b0) u).
 Proof.
-  move E : (Pi a b) => t h.
+  move E : (TBind p a b) => t h.
   move : a b E. elim : n t u /h => //=.
   - move => n a0 a1 ha iha a b ?. subst.
     specialize iha with (1 := eq_refl).
@@ -924,9 +924,9 @@ Proof.
     move : OExp.commutativity0 h1; repeat move/[apply].
     move => [d1 h1].
     exists d1. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
-  - move => n a0 a1 b0 b1 ha iha hb ihb c.
-    move /Pi_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
-    have : EPar.R (Pi a2 b2)(Pi a3 b3)
+  - move => n p a0 a1 b0 b1 ha iha hb ihb c.
+    move /Bind_EPar' => [a2][b2][/iha [a3 h0]][/ihb [b3 h1]]h2 {iha ihb}.
+    have : EPar.R (TBind p a2 b2)(TBind p a3 b3)
       by hauto l:on use:EPar.BindCong.
     move : OExp.commutativity0 h2; repeat move/[apply].
     move => [d h].
@@ -947,7 +947,7 @@ Function tstar {n} (a : Tm n) :=
   | Proj p (Pair a b) => if p is PL then (tstar a) else (tstar b)
   | Proj p (Abs a) => (Abs (Proj p (tstar a)))
   | Proj p a => Proj p (tstar a)
-  | Pi a b => Pi (tstar a) (tstar b)
+  | TBind p a b => TBind p (tstar a) (tstar b)
   | Bot => Bot
   | Univ i => Univ i
   end.
@@ -995,7 +995,7 @@ Qed.
 Fixpoint depth_tm {n} (a : Tm n) :=
   match a with
   | VarTm _ => 1
-  | Pi A B => 1 + max (depth_tm A) (depth_tm B)
+  | TBind _ A B => 1 + max (depth_tm A) (depth_tm B)
   | Abs a => 1 + depth_tm a
   | App a b => 1 + max (depth_tm a) (depth_tm b)
   | Proj p a => 1 + depth_tm a
@@ -1026,7 +1026,7 @@ Proof.
   - hauto lq:on rew:off.
   - hauto lq:on rew:off.
   - hauto lq:on rew:off.
-  - move => n a iha b ihb m ρ hρ.
+  - move => n p a iha b ihb m ρ hρ.
     simpl. f_equal.
     f_equal.
     by apply iha.
@@ -1051,7 +1051,7 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
 
 (* Can consider combine prov and provU *)
 #[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
-  prov A B (Pi A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
+  prov A B (TBind _ A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
   prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a;
   prov A B (App a b) := prov A B a;
   prov A B (Pair a b) := prov A B a /\ prov A B b;
@@ -1061,7 +1061,7 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   prov A B (Univ _) := False .
 
 #[tactic="prov_tac"]Equations provU {n} (i : nat) (a : Tm n) : Prop by wf (depth_tm a) lt :=
-  provU i (Pi A0 B0) := False;
+  provU i (TBind _ A0 B0) := False;
   provU i (Abs a) := provU i a;
   provU i (App a b) := provU i a;
   provU i (Pair a b) := provU i a /\ provU i b;
@@ -1071,7 +1071,7 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   provU i (Univ j) := i = j.
 
 #[tactic="prov_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
-  extract (Pi A B) := Pi A B;
+  extract (TBind p A B) := TBind p A B;
   extract (Abs a) := subst_Tm (scons Bot VarTm) (extract a);
   extract (App a b) := extract a;
   extract (Pair a b) := extract a;
@@ -1125,7 +1125,7 @@ Proof.
   - hauto q:on rew:db:prov.
   - qauto l:on rew:db:prov.
   - hauto lq:on rew:db:prov.
-  - move => n A0 ih B0 h0 m ξ A B. simpl.
+  - move => n p A0 ih B0 h0 m ξ A B. simpl.
     simp prov.
     hauto l:on use:Pars.renaming.
   - sfirstorder.
@@ -1209,7 +1209,7 @@ Proof.
   - hauto l:on rew:db:prov.
   - hauto l:on rew:db:prov.
   - hauto lq:on rew:db:prov.
-  - move => n A0 A1 B0 B1 hA ihA hB ihB A B. simp prov.
+  - move => n p A0 A1 B0 B1 hA ihA hB ihB A B. simp prov.
     move => [hA0 hA1].
     eauto using rtc_r.
   - sfirstorder.
@@ -1236,7 +1236,7 @@ Proof.
   - hauto l:on rew:db:provU.
   - hauto l:on rew:db:provU.
   - hauto lq:on rew:db:provU.
-  - move => n A0 A1 B0 B1 hA ihA hB ihB i. simp provU.
+  - move => n p A0 A1 B0 B1 hA ihA hB ihB i. simp provU.
   - sfirstorder.
   - sfirstorder.
 Qed.
@@ -1251,9 +1251,9 @@ Proof.
   induction 2; hauto lq:on use:provU_par.
 Qed.
 
-Lemma prov_extract n A B (a : Tm n) :
+Lemma prov_extract n p A B (a : Tm n) :
   prov A B a -> exists A0 B0,
-      extract a = Pi A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
+      extract a = TBind p A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
 Proof.
   move : A B. elim : n / a => //=.
   - move => n a ih A B.
@@ -1270,13 +1270,13 @@ Proof.
     move => [B1 [h5 h6]].
     subst.
     have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
-                  subst_Tm (scons Bot VarTm) (ren_Tm shift (Pi A1 B1)) by sauto lq:on.
+                  subst_Tm (scons Bot VarTm) (ren_Tm shift (TBind p A1 B1)) by sauto lq:on.
     move : h0. asimpl. move => ->.
     hauto lq:on.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
   - hauto l:on rew:db:prov, extract.
-  - qauto l:on rew:db:prov, extract.
+  - best rew:db:prov, extract.
 Qed.
 
 Lemma provU_extract n i (a : Tm n) :
