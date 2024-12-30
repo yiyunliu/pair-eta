@@ -15,7 +15,7 @@ Inductive InterpExt {n} i (I : forall n, nat -> Tm n -> Prop) : Tm n -> (Tm n ->
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, PF a PB) ->
   (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) ->
-  ⟦ Pi A B ⟧ i ;; I ↘ (ProdSpace PA PF)
+  ⟦ TBind TPi A B ⟧ i ;; I ↘ (ProdSpace PA PF)
 
 | InterpExt_Univ j :
   j < i ->
@@ -86,19 +86,19 @@ Lemma RPar_substone n (a b : Tm (S n)) (c : Tm n):
   Proof. hauto l:on inv:option use:RPar.substing, RPar.refl. Qed.
 
 Lemma InterpExt_Fun_inv n i I (A : Tm n) B P
-  (h :  ⟦ Pi A B ⟧ i ;; I ↘ P) :
+  (h :  ⟦ TBind TPi A B ⟧ i ;; I ↘ P) :
   exists (PA : Tm n -> Prop) (PF : Tm n -> (Tm n -> Prop) -> Prop),
      ⟦ A ⟧ i ;; I ↘ PA /\
     (forall a, PA a -> exists PB, PF a PB) /\
     (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) /\
     P = ProdSpace PA PF.
 Proof.
-  move E : (Pi A B) h => T h.
+  move E : (TBind TPi A B) h => T h.
   move : A B E.
   elim : T P / h => //.
   - hauto l:on.
   - move => A A0 PA hA hA0 hPi A1 B ?. subst.
-    elim /RPar.inv : hA => //= _ A2 A3 B0 B1 hA1 hB0 [*]. subst.
+    elim /RPar.inv : hA => //= _ p A2 A3 B0 B1 hA1 hB0 [*]. subst.
     hauto lq:on ctrs:InterpExt use:RPar_substone.
 Qed.
 
