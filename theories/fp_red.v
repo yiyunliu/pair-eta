@@ -1,7 +1,7 @@
 From Ltac2 Require Ltac2.
 Import Ltac2.Notations.
 Import Ltac2.Control.
-Require Import ssreflect.
+Require Import ssreflect ssrbool.
 Require Import FunInd.
 Require Import Arith.Wf_nat.
 Require Import Psatz.
@@ -1049,26 +1049,28 @@ Qed.
 Local Ltac prov_tac := sfirstorder use:depth_ren.
 Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
 
-(* Can consider combine prov and provU *)
-#[tactic="prov_tac"]Equations prov {n} (A : Tm n) (B : Tm (S n)) (a : Tm n) : Prop by wf (depth_tm a) lt :=
-  prov A B (TBind _ A0 B0) := rtc Par.R A A0 /\ rtc Par.R B B0;
-  prov A B (Abs a) := prov (ren_Tm shift A) (ren_Tm (upRen_Tm_Tm shift) B) a;
-  prov A B (App a b) := prov A B a;
-  prov A B (Pair a b) := prov A B a /\ prov A B b;
-  prov A B (Proj p a) := prov A B a;
-  prov A B Bot := False;
-  prov A B (VarTm _) := False;
-  prov A B (Univ _) := False .
+Definition prov_bind {n} p0 A0 B0 (a : Tm n)  :=
+  match a with
+  | TBind p A B => p = p0 /\ rtc Par.R A A0 /\ rtc Par.R B B0
+  | _ => False
+  end.
 
-#[tactic="prov_tac"]Equations provU {n} (i : nat) (a : Tm n) : Prop by wf (depth_tm a) lt :=
-  provU i (TBind _ A0 B0) := False;
-  provU i (Abs a) := provU i a;
-  provU i (App a b) := provU i a;
-  provU i (Pair a b) := provU i a /\ provU i b;
-  provU i (Proj p a) := provU i a;
-  provU i Bot := False;
-  provU i (VarTm _) := False;
-  provU i (Univ j) := i = j.
+Definition prov_univ {n} i0 (a : Tm n) :=
+  match a with
+  | Univ i => i = i0
+  | _ => False
+  end.
+
+(* Can consider combine prov and provU *)
+#[tactic="prov_tac"]Equations prov {n} (h : Tm n) (a : Tm n) : Prop by wf (depth_tm a) lt :=
+  prov h (TBind p0 A0 B0) := prov_bind p0 A0 B0 h;
+  prov h (Abs a) := prov (ren_Tm shift h) a;
+  prov h (App a b) := prov h a;
+  prov h (Pair a b) := prov h a /\ prov h b;
+  prov h (Proj p a) := prov h a;
+  prov h Bot := False;
+  prov h (VarTm _) := False;
+  prov h (Univ i) := prov_univ i h .
 
 #[tactic="prov_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
   extract (TBind p A B) := TBind p A B;
@@ -1079,7 +1081,6 @@ Local Ltac extract_tac := rewrite -?depth_subst_bool;hauto use:depth_subst_bool.
   extract Bot := Bot;
   extract (VarTm i) := (VarTm i);
   extract (Univ i) := Univ i.
-
 
 Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
   extract (ren_Tm ξ a) = ren_Tm ξ (extract a).
@@ -1112,91 +1113,80 @@ Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
     lia.
 Qed.
 
-Lemma prov_ren n m (ξ : fin n -> fin m) A B a :
-  prov A B a -> prov (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
+Lemma prov_bind_ren n m p (A : Tm n) B (ξ : fin n -> fin m) a  :
+  prov_bind p A B a ->
+  prov_bind p (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
 Proof.
-  move : m ξ A B. elim : n / a.
+  case : a => //=.
+  hauto l:on use:Pars.renaming.
+Qed.
+
+Lemma prov_ren n m (ξ : fin n -> fin m) h a :
+  prov h a -> prov (ren_Tm ξ h) (ren_Tm ξ a).
+Proof.
+  move : m ξ h. elim : n / a.
   - sfirstorder rew:db:prov.
-  - move => n a ih m ξ A B.
-    simp prov. simpl.
+  - move => n a ih m ξ h.
+    simp prov.
     move /ih => {ih}.
-    move /(_ _ (upRen_Tm_Tm ξ)).
-    simp prov. by asimpl.
+    move /(_ _ (upRen_Tm_Tm ξ)) => /=.
+    simp prov.
+    move => h0.
+    suff  : ren_Tm (upRen_Tm_Tm ξ) (ren_Tm shift h) = ren_Tm shift (ren_Tm ξ h) by move => <-.
+    clear.
+    case : h => * /=; by asimpl.
   - hauto q:on rew:db:prov.
   - qauto l:on rew:db:prov.
   - hauto lq:on rew:db:prov.
-  - move => n p A0 ih B0 h0 m ξ A B. simpl.
-    simp prov.
-    hauto l:on use:Pars.renaming.
+  - hauto l:on use:prov_bind_ren rew:db:prov.
   - sfirstorder.
-  - sfirstorder.
+  - hauto l:on inv:Tm rew:db:prov.
 Qed.
 
-Lemma provU_ren n m (ξ : fin n -> fin m) i a :
-  provU i a -> provU i (ren_Tm ξ a).
-Proof.
-  move : m ξ i. elim : n / a.
-  - sfirstorder rew:db:prov.
-  - move => n a ih m ξ i.
-    simp provU =>/=.
-    move /ih => {ih}.
-    move /(_ _ (upRen_Tm_Tm ξ)).
-    simp provU.
-  - hauto q:on rew:db:provU.
-  - qauto l:on rew:db:provU.
-  - hauto lq:on rew:db:provU.
-  - move => n A0 ih B0 h0 m ξ i /=.
-    simp prov.
-  - sfirstorder.
-  - sfirstorder.
-Qed.
+Definition hfb {n} (a : Tm n) :=
+  match a with
+  | TBind _ _ _ => true
+  | Univ _ => true
+  | _ => false
+  end.
 
-Lemma prov_morph n m (ρ : fin n -> Tm m) A B a :
-  prov A B a ->
-  prov (subst_Tm ρ A) (subst_Tm (up_Tm_Tm ρ) B) (subst_Tm ρ a).
+Lemma prov_morph n m (ρ : fin n -> Tm m) h a :
+  prov h a ->
+  hfb h ->
+  prov (subst_Tm ρ h) (subst_Tm ρ a).
 Proof.
-  move : m ρ A B. elim : n / a.
+  move : m ρ h. elim : n / a.
   - hauto q:on rew:db:prov.
-  - move => n a ih m ρ A B.
+  - move => n a ih m ρ h + hb.
     simp prov => /=.
     move /ih => {ih}.
-    move /(_ _ (up_Tm_Tm ρ)). asimpl.
+    move /(_ _ (up_Tm_Tm ρ) ltac:(hauto lq:on inv:Tm)).
     simp prov. by asimpl.
   - hauto q:on rew:db:prov.
   - hauto q:on rew:db:prov.
   - hauto lq:on rew:db:prov.
-  - hauto l:on use:Pars.substing rew:db:prov.
+  - move => n p A ihA B ihB m ρ h /=. simp prov => //= + h0.
+    case : h h0 => //=.
+    move => p0 A0 B0 _ [? [h1 h2]]. subst.
+    hauto l:on use:Pars.substing rew:db:prov.
   - qauto rew:db:prov.
-  - qauto rew:db:prov.
+  - hauto l:on inv:Tm rew:db:prov.
 Qed.
 
-Lemma provU_morph n m (ρ : fin n -> Tm m) i a :
-  provU i a ->
-  provU i (subst_Tm ρ a).
-Proof.
-  move : m ρ i. elim : n / a.
-  - hauto q:on rew:db:provU.
-  - move => n a ih m ρ i.
-    simp provU => /=.
-    move /ih => {ih}.
-    move /(_ _ (up_Tm_Tm ρ)). asimpl.
-    simp provU.
-  - hauto q:on rew:db:provU.
-  - hauto q:on rew:db:provU.
-  - hauto lq:on rew:db:provU.
-  - hauto l:on use:Pars.substing rew:db:provU.
-  - qauto rew:db:provU.
-  - qauto rew:db:provU.
-Qed.
+Lemma ren_hfb {n m} (ξ : fin n -> fin m) u  : hfb (ren_Tm ξ u) = hfb u.
+Proof. move : m ξ. elim : n /u =>//=. Qed.
 
-Lemma prov_par n (A : Tm n) B a b : prov A B a -> Par.R a b -> prov A B b.
+Hint Rewrite @ren_hfb : prov.
+
+Lemma prov_par n (u : Tm n) a b : prov u a -> hfb u -> Par.R a b -> prov u b.
 Proof.
-  move => + h. move : A B.
+  move => + + h. move : u.
   elim : n a b /h.
-  - move => n a0 a1 b0 b1 ha iha hb ihb A B /=.
-    simp prov => h.
-    move /iha : h.
-    move /(prov_morph _ _ (scons b1 VarTm)).
+  - move => n a0 a1 b0 b1 ha iha hb ihb u /=.
+    simp prov => h h0.
+    have h1 : hfb (ren_Tm shift u) by eauto using ren_hfb.
+    move /iha /(_ h1) : h.
+    move /(prov_morph _ _ (scons b1 VarTm)) /(_ h1).
     by asimpl.
   - hauto lq:on rew:db:prov.
   - hauto lq:on rew:db:prov.
@@ -1205,98 +1195,58 @@ Proof.
     hauto l:on use:prov_ren.
   - hauto l:on rew:db:prov.
   - simp prov.
-  - move => n a0 a1 ha iha A B. simp prov.
+  - hauto lq:on rew:db:prov.
   - hauto l:on rew:db:prov.
   - hauto l:on rew:db:prov.
   - hauto lq:on rew:db:prov.
-  - move => n p A0 A1 B0 B1 hA ihA hB ihB A B. simp prov.
-    move => [hA0 hA1].
-    eauto using rtc_r.
+  - move => n p A0 A1 B0 B1 hA ihA hB ihB u. simp prov.
+    case : u => //=.
+    move => p0 A B [? [h2 h3]]. subst.
+    move => ?. repeat split => //=;
+    hauto l:on use:rtc_r rew:db:prov.
   - sfirstorder.
   - sfirstorder.
 Qed.
 
-Lemma provU_par n i (a b : Tm n) : provU i a -> Par.R a b -> provU i b.
+Lemma prov_pars n (u : Tm n) a b : hfb u -> prov u a -> rtc Par.R a b -> prov u b.
 Proof.
-  move => + h. move : i.
-  elim : n a b /h.
-  - move => n a0 a1 b0 b1 ha iha hb ihb i /=.
-    simp provU => h.
-    move /iha : h.
-    move /(provU_morph _ _ (scons b1 VarTm)).
-    by asimpl.
-  - hauto lq:on rew:db:provU.
-  - hauto lq:on rew:db:provU.
-  - hauto lq:on rew:db:provU.
-  - move => n a0 a1 ha iha i. simp provU. move /iha.
-    hauto l:on use:provU_ren.
-  - hauto l:on rew:db:provU.
-  - simp provU.
-  - move => n a0 a1 ha iha i. simp provU.
-  - hauto l:on rew:db:provU.
-  - hauto l:on rew:db:provU.
-  - hauto lq:on rew:db:provU.
-  - move => n p A0 A1 B0 B1 hA ihA hB ihB i. simp provU.
-  - sfirstorder.
-  - sfirstorder.
+  induction 3; hauto lq:on ctrs:rtc use:prov_par.
 Qed.
 
-Lemma prov_pars n (A : Tm n) B a b : prov A B a -> rtc Par.R a b -> prov A B b.
-Proof.
-  induction 2; hauto lq:on use:prov_par.
-Qed.
+Definition prov_extract_spec {n} u (a : Tm n) :=
+  match u with
+  | TBind p A B => exists A0 B0, extract a = TBind p A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0
+  | Univ i => extract a = Univ i
+  | _ => True
+  end.
 
-Lemma provU_pars n i (a : Tm n) b : provU i a -> rtc Par.R a b -> provU i b.
+Lemma prov_extract n u (a : Tm n) :
+  prov u a -> prov_extract_spec u a.
 Proof.
-  induction 2; hauto lq:on use:provU_par.
-Qed.
-
-Lemma prov_extract n p A B (a : Tm n) :
-  prov A B a -> exists A0 B0,
-      extract a = TBind p A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0.
-Proof.
-  move : A B. elim : n / a => //=.
-  - move => n a ih A B.
-    simp prov.
-    move /ih.
-    simp extract.
-    move => [A0][B0][h0][h1]h2.
-    (* anti renaming for par *)
-    have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0
-        by hauto l:on use:Pars.antirenaming.
-    move => [A1 [h3 h4]].
-    have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
-        by hauto l:on use:Pars.antirenaming.
-    move => [B1 [h5 h6]].
-    subst.
-    have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
-                  subst_Tm (scons Bot VarTm) (ren_Tm shift (TBind p A1 B1)) by sauto lq:on.
-    move : h0. asimpl. move => ->.
-    hauto lq:on.
-  - hauto l:on rew:db:prov, extract.
-  - hauto l:on rew:db:prov, extract.
-  - hauto l:on rew:db:prov, extract.
-  - best rew:db:prov, extract.
-Qed.
-
-Lemma provU_extract n i (a : Tm n) :
-  provU i a -> extract a = Univ i.
-Proof.
-  move : i. elim : n / a => //=.
-  - move => n a ih i.
-    simp provU.
-    move /ih.
-    simp extract.
-    move => h.
-    (* anti renaming for par *)
-    have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
-    subst_Tm (scons Bot VarTm) (ren_Tm shift (Univ i)) by sauto lq:on.
-    move : h0. asimpl. move => ->.
-    hauto lq:on.
-  - hauto l:on rew:db:provU, extract.
-  - hauto l:on rew:db:provU, extract.
-  - hauto l:on rew:db:provU, extract.
-  - qauto l:on rew:db:provU, extract.
+  move : u. elim : n / a => //=.
+  - move => n a ih [] //=.
+    + move => p A B /=.
+      simp prov. move /ih {ih}.
+      simpl.
+      move => [A0[B0[h [h0 h1]]]].
+      have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0
+          by hauto l:on use:Pars.antirenaming.
+      move => [A1 [h3 h4]].
+      have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
+          by hauto l:on use:Pars.antirenaming.
+      move => [B1 [h5 h6]].
+      subst.
+      have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
+                    subst_Tm (scons Bot VarTm) (ren_Tm shift (TBind p A1 B1)) by sauto lq:on.
+      move : h0. asimpl.
+      hauto lq:on rew:db:extract.
+    + hauto q:on rew:db:extract, prov.
+  - hauto lq:on rew:off inv:Tm rew:db:prov, extract.
+  - move => + + + + + []//=;
+      hauto lq:on rew:off rew:db:prov, extract.
+  - hauto inv:Tm l:on rew:db:prov, extract.
+  - hauto l:on inv:Tm rew:db:prov, extract.
+  - hauto l:on inv:Tm rew:db:prov, extract.
 Qed.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
@@ -1375,10 +1325,10 @@ Module ERPar.
     - sfirstorder use:EPar.AppCong, @rtc_once.
   Qed.
 
-  Lemma BindCong n (a0 a1 : Tm n) b0 b1:
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1:
     R a0 a1 ->
     R b0 b1 ->
-    rtc R (Pi a0 b0) (Pi a1 b1).
+    rtc R (TBind p a0 b0) (TBind p a1 b1).
   Proof.
     move => [] + [].
     - sfirstorder use:RPar.BindCong, @rtc_once.
@@ -1454,10 +1404,10 @@ Module ERPars.
     rtc ERPar.R (Proj p a0) (Proj p a1).
   Proof. solve_s. Qed.
 
-  Lemma BindCong n (a0 a1 : Tm n) b0 b1:
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1:
     rtc ERPar.R a0 a1 ->
     rtc ERPar.R b0 b1 ->
-    rtc ERPar.R (Pi a0 b0) (Pi a1 b1).
+    rtc ERPar.R (TBind p a0 b0) (TBind p a1 b1).
   Proof. solve_s. Qed.
 
   Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
@@ -1690,18 +1640,20 @@ Lemma pars_univ_inv n i (c : Tm n) :
   rtc Par.R (Univ i) c ->
   extract c = Univ i.
 Proof.
-  have : provU i (Univ i : Tm n) by sfirstorder.
-  move : provU_pars. repeat move/[apply].
-  by move/provU_extract.
+  have : prov (Univ i) (Univ i : Tm n) by sfirstorder.
+  move : prov_pars. repeat move/[apply].
+  move /(_ ltac:(reflexivity)).
+  by move/prov_extract.
 Qed.
 
-Lemma pars_pi_inv n (A : Tm n) B C :
-  rtc Par.R (Pi A B) C ->
-  exists A0 B0, extract C = Pi A0 B0 /\
+Lemma pars_pi_inv n p (A : Tm n) B C :
+  rtc Par.R (TBind p A B) C ->
+  exists A0 B0, extract C = TBind p A0 B0 /\
              rtc Par.R A A0 /\ rtc Par.R B B0.
 Proof.
-  have : prov A B (Pi A B) by sfirstorder.
+  have : prov (TBind p A B) (TBind p A B) by sfirstorder.
   move : prov_pars. repeat move/[apply].
+  move /(_ eq_refl).
   by move /prov_extract.
 Qed.
 
@@ -1713,10 +1665,10 @@ Proof.
   sauto l:on use:pars_univ_inv.
 Qed.
 
-Lemma pars_pi_inj n (A0 A1 : Tm n) B0 B1 C :
-  rtc Par.R (Pi A0 B0) C ->
-  rtc Par.R (Pi A1 B1) C ->
-  exists A2 B2, rtc Par.R A0 A2 /\ rtc Par.R A1 A2 /\
+Lemma pars_pi_inj n p0 p1 (A0 A1 : Tm n) B0 B1 C :
+  rtc Par.R (TBind p0 A0 B0) C ->
+  rtc Par.R (TBind p1 A1 B1) C ->
+  exists A2 B2, p1 = p0 /\ rtc Par.R A0 A2 /\ rtc Par.R A1 A2 /\
              rtc Par.R B0 B2 /\ rtc Par.R B1 B2.
 Proof.
   move /pars_pi_inv => [A2 [B2 [? [h0 h1]]]].
@@ -1730,17 +1682,17 @@ Proof.
   sfirstorder use:pars_univ_inj.
 Qed.
 
-Lemma join_pi_inj n (A0 A1 : Tm n) B0 B1 :
-  join (Pi A0 B0) (Pi A1 B1) ->
-  join A0 A1 /\ join B0 B1.
+Lemma join_pi_inj n p0 p1 (A0 A1 : Tm n) B0 B1 :
+  join (TBind p0 A0 B0) (TBind p1 A1 B1) ->
+  p0 = p1 /\ join A0 A1 /\ join B0 B1.
 Proof.
   move => [c []].
   move : pars_pi_inj; repeat move/[apply].
   sfirstorder unfold:join.
 Qed.
 
-Lemma join_univ_pi_contra n (A : Tm n) B i :
-  join (Pi A B) (Univ i) -> False.
+Lemma join_univ_pi_contra n p (A : Tm n) B i :
+  join (TBind p A B) (Univ i) -> False.
 Proof.
   rewrite /join.
   move => [c [h0 h1]].
