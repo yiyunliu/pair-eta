@@ -6,16 +6,22 @@ Require Import ssreflect ssrbool.
 Require Import Logic.PropExtensionality (propositional_extensionality).
 From stdpp Require Import relations (rtc(..)).
 Definition ProdSpace {n} (PA : Tm n -> Prop)
-  (PF : Tm n -> (Tm n -> Prop) -> Prop) : Tm n -> Prop :=
-  fun b => forall a PB, PA a -> PF a PB -> PB (App b a).
+  (PF : Tm n -> (Tm n -> Prop) -> Prop) b : Prop :=
+  forall a PB, PA a -> PF a PB -> PB (App b a).
+
+Definition SumSpace {n} (PA : Tm n -> Prop)
+  (PF : Tm n -> (Tm n -> Prop) -> Prop) t : Prop :=
+  exists a b, rtc RPar.R t (Pair a b) /\ PA a /\ (forall PB, PF a PB -> PB b).
+
+Definition BindSpace {n} p := if p is TPi then @ProdSpace n else @SumSpace n.
 
 Reserved Notation "⟦ A ⟧ i ;; I ↘ S" (at level 70).
 Inductive InterpExt {n} i (I : forall n, nat -> Tm n -> Prop) : Tm n -> (Tm n -> Prop) -> Prop :=
-| InterpExt_Fun A B PA PF :
+| InterpExt_Bind p A B PA PF :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, PF a PB) ->
   (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) ->
-  ⟦ TBind TPi A B ⟧ i ;; I ↘ (ProdSpace PA PF)
+  ⟦ TBind p A B ⟧ i ;; I ↘ BindSpace p PA PF
 
 | InterpExt_Univ j :
   j < i ->
@@ -105,7 +111,7 @@ Qed.
 Lemma InterpExt_Fun_nopf n i I (A : Tm n) B PA  :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘  PB) ->
-  ⟦ Pi A B ⟧ i ;; I ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB)).
+  ⟦ TBind TPi A B ⟧ i ;; I ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB)).
 Proof.
   move => h0 h1. apply InterpExt_Fun =>//.
 Qed.
@@ -113,7 +119,7 @@ Qed.
 Lemma InterpUnivN_Fun_nopf n i (A : Tm n) B PA :
   ⟦ A ⟧ i ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) ->
-  ⟦ Pi A B ⟧ i ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB)).
+  ⟦ TBind TPi A B ⟧ i ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB)).
 Proof.
   hauto l:on use:InterpExt_Fun_nopf rew:db:InterpUniv.
 Qed.
@@ -143,7 +149,7 @@ Proof.
   elim : A P / h; auto.
   - move => A B PA PF hPA ihPA hPB hPB' ihPB T hT.
     elim /RPar.inv :  hT => //.
-    move => hPar A0 A1 B0 B1 h0 h1 [? ?] ?; subst.
+    move => hPar p A0 A1 B0 B1 h0 h1 [? ?] ? ?; subst.
     apply InterpExt_Fun; auto.
     move => a PB hPB0.
     apply : ihPB; eauto.
@@ -179,20 +185,13 @@ Lemma InterpUnivN_back_preservation_star n i (A : Tm n) B P (h : ⟦ B ⟧ i ↘
   ⟦ A ⟧ i ↘ P.
 Proof. hauto l:on rew:db:InterpUnivN use:InterpExt_back_preservation_star. Qed.
 
-Definition ty_hf {n} (a : Tm n) :=
-  match a with
-  | Pi _ _ => true
-  | Univ _ => true
-  | _ => false
-  end.
-
 Lemma InterpExtInv n i I (A : Tm n) PA :
   ⟦ A ⟧ i ;; I ↘ PA ->
-  exists B, ty_hf B /\ rtc RPar.R A B /\  ⟦ B ⟧ i ;; I ↘ PA.
+  exists B, hfb B /\ rtc RPar.R A B /\  ⟦ B ⟧ i ;; I ↘ PA.
 Proof.
   move => h. elim : A PA /h.
   - move => A B PA PF hPA _ hPF hPF0 _.
-    exists (Pi A B). repeat split => //=.
+    exists (TBind TPi A B). repeat split => //=.
     apply rtc_refl.
     hauto l:on ctrs:InterpExt.
   - move => j ?. exists (Univ j).
@@ -210,7 +209,7 @@ Proof.
   - move => A B PA PF hPA ihPA hTot hRes ihPF U PU /InterpExtInv.
     move => [B0 []].
     case : B0 => //=.
-    + move => A0 B0 _ [hr hPi].
+    + move => p A0 B0 _ [hr hPi].
       move /InterpExt_Fun_inv : hPi.
       move => [PA0][PF0][hPA0][hTot0][hRes0]?. subst.
       move => hjoin.

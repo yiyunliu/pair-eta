@@ -1101,6 +1101,7 @@ Qed.
 
 Lemma tm_depth_ind (P : forall n, Tm n -> Prop)   :
   (forall n (a : Tm n), (forall m (b : Tm m), depth_tm b < depth_tm a -> P m b)  -> P n a) -> forall n a, P n a.
+Proof.
   move => ih.
   suff : forall m n (a : Tm n), depth_tm a <= m -> P n a by sfirstorder.
   elim.
