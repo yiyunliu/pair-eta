@@ -4,7 +4,7 @@ From Hammer Require Import Tactics.
 From Equations Require Import Equations.
 Require Import ssreflect ssrbool.
 Require Import Logic.PropExtensionality (propositional_extensionality).
-From stdpp Require Import relations (rtc(..)).
+From stdpp Require Import relations (rtc(..), rtc_subrel).
 Definition ProdSpace {n} (PA : Tm n -> Prop)
   (PF : Tm n -> (Tm n -> Prop) -> Prop) b : Prop :=
   forall a PB, PA a -> PF a PB -> PB (App b a).
@@ -91,37 +91,37 @@ Lemma RPar_substone n (a b : Tm (S n)) (c : Tm n):
     RPar.R a b -> RPar.R (subst_Tm (scons c VarTm) a) (subst_Tm (scons c VarTm) b).
   Proof. hauto l:on inv:option use:RPar.substing, RPar.refl. Qed.
 
-Lemma InterpExt_Fun_inv n i I (A : Tm n) B P
-  (h :  ⟦ TBind TPi A B ⟧ i ;; I ↘ P) :
+Lemma InterpExt_Bind_inv n p i I (A : Tm n) B P
+  (h :  ⟦ TBind p A B ⟧ i ;; I ↘ P) :
   exists (PA : Tm n -> Prop) (PF : Tm n -> (Tm n -> Prop) -> Prop),
      ⟦ A ⟧ i ;; I ↘ PA /\
     (forall a, PA a -> exists PB, PF a PB) /\
     (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) /\
-    P = ProdSpace PA PF.
+    P = BindSpace p PA PF.
 Proof.
-  move E : (TBind TPi A B) h => T h.
+  move E : (TBind p A B) h => T h.
   move : A B E.
   elim : T P / h => //.
   - hauto l:on.
   - move => A A0 PA hA hA0 hPi A1 B ?. subst.
-    elim /RPar.inv : hA => //= _ p A2 A3 B0 B1 hA1 hB0 [*]. subst.
+    elim /RPar.inv : hA => //= _ p0 A2 A3 B0 B1 hA1 hB0 [*]. subst.
     hauto lq:on ctrs:InterpExt use:RPar_substone.
 Qed.
 
-Lemma InterpExt_Fun_nopf n i I (A : Tm n) B PA  :
+Lemma InterpExt_Bind_nopf n p i I (A : Tm n) B PA  :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘  PB) ->
-  ⟦ TBind TPi A B ⟧ i ;; I ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB)).
+  ⟦ TBind p A B ⟧ i ;; I ↘ (BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB)).
 Proof.
-  move => h0 h1. apply InterpExt_Fun =>//.
+  move => h0 h1. apply InterpExt_Bind =>//.
 Qed.
 
-Lemma InterpUnivN_Fun_nopf n i (A : Tm n) B PA :
+Lemma InterpUnivN_Fun_nopf n p i (A : Tm n) B PA :
   ⟦ A ⟧ i ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) ->
-  ⟦ TBind TPi A B ⟧ i ↘ (ProdSpace PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB)).
+  ⟦ TBind p A B ⟧ i ↘ (BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB)).
 Proof.
-  hauto l:on use:InterpExt_Fun_nopf rew:db:InterpUniv.
+  hauto l:on use:InterpExt_Bind_nopf rew:db:InterpUniv.
 Qed.
 
 Lemma InterpExt_cumulative n i j I (A : Tm n) PA :
@@ -147,11 +147,10 @@ Lemma InterpExt_preservation n i I (A : Tm n) B P (h : InterpExt i I A P) :
 Proof.
   move : B.
   elim : A P / h; auto.
-  - move => A B PA PF hPA ihPA hPB hPB' ihPB T hT.
+  - move => p A B PA PF hPA ihPA hPB hPB' ihPB T hT.
     elim /RPar.inv :  hT => //.
-    move => hPar p A0 A1 B0 B1 h0 h1 [? ?] ? ?; subst.
-    apply InterpExt_Fun; auto.
-    move => a PB hPB0.
+    move => hPar p0 A0 A1 B0 B1 h0 h1 [? ?] ? ?; subst.
+    apply InterpExt_Bind; auto => a PB hPB0.
     apply : ihPB; eauto.
     sfirstorder use:RPar.cong, RPar.refl.
   - hauto lq:on inv:RPar.R ctrs:InterpExt.
@@ -190,13 +189,44 @@ Lemma InterpExtInv n i I (A : Tm n) PA :
   exists B, hfb B /\ rtc RPar.R A B /\  ⟦ B ⟧ i ;; I ↘ PA.
 Proof.
   move => h. elim : A PA /h.
-  - move => A B PA PF hPA _ hPF hPF0 _.
-    exists (TBind TPi A B). repeat split => //=.
+  - move => p A B PA PF hPA _ hPF hPF0 _.
+    exists (TBind p A B). repeat split => //=.
     apply rtc_refl.
     hauto l:on ctrs:InterpExt.
   - move => j ?. exists (Univ j).
     hauto l:on ctrs:InterpExt.
   - hauto lq:on ctrs:rtc.
+Qed.
+
+Lemma RPars_Pars {n} (A B : Tm n) :
+  rtc RPar.R A B ->
+  rtc Par.R A B.
+Proof. hauto lq:on use:RPar_Par, rtc_subrel. Qed.
+
+Lemma RPars_join {n} (A B : Tm n) :
+  rtc RPar.R A B -> join A B.
+Proof. hauto lq:on ctrs:rtc use:RPars_Pars. Qed.
+
+Lemma bindspace_iff {n} p (PA : Tm n -> Prop) PF PF0 b  :
+  (forall (a : Tm n) (PB PB0 : Tm n -> Prop), PF a PB -> PF0 a PB0 -> PB = PB0) ->
+  (forall a, PA a -> exists PB, PF a PB) ->
+  (forall a, PA a -> exists PB0, PF0 a PB0) ->
+  (BindSpace p PA PF b <-> BindSpace p PA PF0 b).
+Proof.
+  rewrite /BindSpace => h hPF hPF0.
+  case : p => /=.
+  - rewrite /ProdSpace.
+    split.
+    move => h1 a PB ha hPF'.
+    specialize hPF with (1 := ha).
+    specialize hPF0 with (1 := ha).
+    sblast.
+    move => ? a PB ha.
+    specialize hPF with (1 := ha).
+    specialize hPF0 with (1 := ha).
+    sblast.
+  - rewrite /SumSpace.
+    hauto lq:on rew:off.
 Qed.
 
 Lemma InterpExt_Join n i I (A B : Tm n) PA PB :
@@ -206,22 +236,31 @@ Lemma InterpExt_Join n i I (A B : Tm n) PA PB :
   PA = PB.
 Proof.
   move => h. move : B PB. elim : A PA /h.
-  - move => A B PA PF hPA ihPA hTot hRes ihPF U PU /InterpExtInv.
+  - move => p A B PA PF hPA ihPA hTot hRes ihPF U PU /InterpExtInv.
     move => [B0 []].
     case : B0 => //=.
-    + move => p A0 B0 _ [hr hPi].
-      move /InterpExt_Fun_inv : hPi.
+    + move => p0 A0 B0 _ [hr hPi].
+      move /InterpExt_Bind_inv : hPi.
       move => [PA0][PF0][hPA0][hTot0][hRes0]?. subst.
       move => hjoin.
-      have ? : join A A0 by admit.
-      have ? : join B B0 by admit.
+      have{}hr : join U (TBind p0 A0 B0) by auto using RPars_join.
+      have hj : join (TBind p A B) (TBind p0 A0 B0) by eauto using join_transitive.
+      have {hj} : p0 = p /\ join A A0 /\ join B B0 by hauto l:on use:join_pi_inj.
+      move => [? [h0 h1]]. subst.
       have ? : PA0 = PA by hauto l:on. subst.
       rewrite /ProdSpace.
       extensionality b.
       apply propositional_extensionality.
-      admit.
-    (* Contradiction *)
-    + admit.
+      apply bindspace_iff; eauto.
+      move => a PB PB0 hPB hPB0.
+      apply : ihPF; eauto.
+      by apply join_substing.
+    + move => j _.
+      move => [h0 h1] h.
+      have ? : join U (Univ j) by eauto using RPars_join.
+      have : join (TBind p A B) (Univ j) by eauto using join_transitive.
+      move => ?. exfalso.
+      eauto using join_univ_pi_contra.
   - admit.
   - admit.
 Admitted.

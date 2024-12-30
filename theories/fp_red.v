@@ -1617,26 +1617,6 @@ Proof.
   hauto lq:on use:rtc_union.
 Qed.
 
-Definition join {n} (a b : Tm n) :=
-  exists c, rtc Par.R a c /\ rtc Par.R b c.
-
-Lemma join_transitive n (a b c : Tm n) :
-  join a b -> join b c -> join a c.
-Proof.
-  rewrite /join.
-  move => [ab [h0 h1]] [bc [h2 h3]].
-  move : Par_confluent h1 h2; repeat move/[apply].
-  move => [abc [h4 h5]].
-  eauto using relations.rtc_transitive.
-Qed.
-
-Lemma join_symmetric n (a b : Tm n) :
-  join a b -> join b a.
-Proof. sfirstorder unfold:join. Qed.
-
-Lemma join_refl n (a : Tm n) : join a a.
-Proof. hauto lq:on ctrs:rtc unfold:join. Qed.
-
 Lemma pars_univ_inv n i (c : Tm n) :
   rtc Par.R (Univ i) c ->
   extract c = Univ i.
@@ -1677,6 +1657,26 @@ Proof.
   exists A2, B2. hauto l:on.
 Qed.
 
+Definition join {n} (a b : Tm n) :=
+  exists c, rtc Par.R a c /\ rtc Par.R b c.
+
+Lemma join_transitive n (a b c : Tm n) :
+  join a b -> join b c -> join a c.
+Proof.
+  rewrite /join.
+  move => [ab [h0 h1]] [bc [h2 h3]].
+  move : Par_confluent h1 h2; repeat move/[apply].
+  move => [abc [h4 h5]].
+  eauto using relations.rtc_transitive.
+Qed.
+
+Lemma join_symmetric n (a b : Tm n) :
+  join a b -> join b a.
+Proof. sfirstorder unfold:join. Qed.
+
+Lemma join_refl n (a : Tm n) : join a a.
+Proof. hauto lq:on ctrs:rtc unfold:join. Qed.
+
 Lemma join_univ_inj n i j (C : Tm n) :
   join (Univ i : Tm n) (Univ j) -> i = j.
 Proof.
@@ -1701,3 +1701,9 @@ Proof.
   move /pars_pi_inv : h0.
   hauto l:on.
 Qed.
+
+
+Lemma join_substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+  join a b ->
+  join (subst_Tm ρ a) (subst_Tm ρ b).
+Proof. hauto lq:on unfold:join use:Pars.substing. Qed.
