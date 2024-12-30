@@ -1677,7 +1677,7 @@ Proof. sfirstorder unfold:join. Qed.
 Lemma join_refl n (a : Tm n) : join a a.
 Proof. hauto lq:on ctrs:rtc unfold:join. Qed.
 
-Lemma join_univ_inj n i j (C : Tm n) :
+Lemma join_univ_inj n i j :
   join (Univ i : Tm n) (Univ j) -> i = j.
 Proof.
   sfirstorder use:pars_univ_inj.

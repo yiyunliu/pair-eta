@@ -108,6 +108,17 @@ Proof.
     hauto lq:on ctrs:InterpExt use:RPar_substone.
 Qed.
 
+Lemma InterpExt_Univ_inv n i I j P
+  (h :  ⟦ @Univ n j  ⟧ i ;; I ↘ P) :
+  P = I n j /\ j < i.
+Proof.
+  move : h.
+  move E : (@Univ n j) => T h. move : j E.
+  elim : T P /h => //.
+  - hauto l:on.
+  - hauto lq:on rew:off inv:RPar.R.
+Qed.
+
 Lemma InterpExt_Bind_nopf n p i I (A : Tm n) B PA  :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘  PB) ->
@@ -261,6 +272,18 @@ Proof.
       have : join (TBind p A B) (Univ j) by eauto using join_transitive.
       move => ?. exfalso.
       eauto using join_univ_pi_contra.
-  - admit.
-  - admit.
-Admitted.
+  - move => j ? B PB /InterpExtInv.
+    move => [+ []]. case => //=.
+    + move => p A0 B0 _ [].
+      move /RPars_join => *.
+      have ?  : join (TBind p A0 B0) (Univ j) by eauto using join_symmetric, join_transitive.
+      exfalso.
+      eauto using join_univ_pi_contra.
+    + move => m _ [/RPars_join h0 + h1].
+      have /join_univ_inj {h0 h1} ?  : join (Univ j : Tm n) (Univ m) by eauto using join_transitive.
+      subst.
+      move /InterpExt_Univ_inv. firstorder.
+  - move => A A0 PA h.
+    have /join_symmetric {}h : join A A0 by hauto lq:on ctrs:rtc use:RPar_Par, relations.rtc_once.
+    eauto using join_transitive.
+Qed.
