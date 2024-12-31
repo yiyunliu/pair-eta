@@ -287,3 +287,115 @@ Proof.
     have /join_symmetric {}h : join A A0 by hauto lq:on ctrs:rtc use:RPar_Par, relations.rtc_once.
     eauto using join_transitive.
 Qed.
+
+Lemma InterpUniv_Bind_inv n p i  (A : Tm n) B P
+  (h :  ⟦ TBind p A B ⟧ i ↘ P) :
+  exists (PA : Tm n -> Prop) (PF : Tm n -> (Tm n -> Prop) -> Prop),
+     ⟦ A ⟧ i ↘ PA /\
+    (forall a, PA a -> exists PB, PF a PB) /\
+    (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) /\
+    P = BindSpace p PA PF.
+Proof. hauto l:on use:InterpExt_Bind_inv rew:db:InterpUniv. Qed.
+
+Lemma InterpUniv_Univ_inv n i j P
+  (h :  ⟦ @Univ n j  ⟧ i ↘ P) :
+  P = (fun (A : Tm n) => exists PA, ⟦ A ⟧ j ↘ PA) /\ j < i.
+Proof. hauto l:on use:InterpExt_Univ_inv rew:db:InterpUniv. Qed.
+
+Lemma InterpExt_Functional n i I (A B : Tm n) PA PB :
+  ⟦ A ⟧ i ;; I ↘ PA ->
+  ⟦ A ⟧ i ;; I ↘ PB ->
+  PA = PB.
+Proof. hauto use:InterpExt_Join, join_refl. Qed.
+
+Lemma InterpUniv_Functional n i (A B : Tm n) PA PB :
+  ⟦ A ⟧ i ↘ PA ->
+  ⟦ A ⟧ i ↘ PB ->
+  PA = PB.
+Proof. hauto use:InterpExt_Functional rew:db:InterpUniv. Qed.
+
+Lemma InterpExt_Bind_inv_nopf n i I p A B P (h :  ⟦TBind p A B ⟧ i ;; I ↘ P) :
+  exists (PA : Tm n -> Prop),
+     ⟦ A ⟧ i ;; I ↘ PA /\
+    (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) /\
+      P = BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB).
+Proof.
+  move /InterpExt_Bind_inv : h. intros (PA & PF & hPA & hPF & hPF' & ?); subst.
+  exists PA. repeat split => //.
+  - sfirstorder.
+  - extensionality b.
+    case : p => /=.
+    + extensionality a.
+      extensionality PB.
+      extensionality ha.
+      apply propositional_extensionality.
+      split.
+      * hecrush use:InterpExt_Functional.
+      * sfirstorder.
+    + rewrite /SumSpace. apply propositional_extensionality.
+      split; hauto q:on use:InterpExt_Functional.
+Qed.
+
+Lemma InterpUniv_Bind_inv_nopf n i p A B P (h :  ⟦TBind p A B ⟧ i ↘ P) :
+  exists (PA : Tm n -> Prop),
+     ⟦ A ⟧ i ↘ PA /\
+    (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) /\
+      P = BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB).
+Proof. hauto l:on use:InterpExt_Bind_inv_nopf rew:db:InterpUniv. Qed.
+
+Lemma InterpExt_back_clos n i I (A : Tm n) PA :
+  (forall j,  forall a b, (RPar.R a b) ->  I n j b -> I n j a) ->
+    ⟦ A ⟧ i ;; I ↘ PA ->
+    forall a b, (RPar.R a b) ->
+           PA b -> PA a.
+Proof.
+  move => hI h.
+  elim : A PA /h.
+  - move => p A B PA PF hPA ihPA hTot hRes ihPF a b hr.
+    case : p => //=.
+    + have  : forall b0 b1 a, RPar.R b0 b1 -> RPar.R (App b0 a) (App b1 a)
+          by hauto lq:on ctrs:RPar.R use:RPar.refl.
+      hauto lq:on rew:off unfold:ProdSpace.
+    + hauto lq:on ctrs:rtc unfold:SumSpace.
+  - eauto.
+  - eauto.
+Qed.
+
+Lemma InterpUniv_back_clos n i (A : Tm n) PA :
+    ⟦ A ⟧ i ↘ PA ->
+    forall a b, (RPar.R a b) ->
+           PA b -> PA a.
+Proof.
+  simp InterpUniv.
+  apply InterpExt_back_clos.
+  hauto lq:on ctrs:rtc use:InterpUnivN_back_preservation_star.
+Qed.
+
+Lemma InterpUniv_back_clos_star n i (A : Tm n) PA :
+    ⟦ A ⟧ i ↘ PA ->
+    forall a b, rtc RPar.R a b ->
+           PA b -> PA a.
+Proof.
+  move => h  a b.
+  induction 1=> //.
+  hauto lq:on use:InterpUniv_back_clos.
+Qed.
+
+Definition ρ_ok {n} Γ (ρ : fin n -> Tm n) := forall i m PA,
+  ⟦ Γ i ⟧ m ↘ PA -> PA (ρ i).
+
+Definition SemWt {n} Γ (a A : Tm n) := forall ρ, ρ_ok Γ ρ -> forall (i : fin n), exists m PA, ⟦ subst_Tm ρ (Γ i) ⟧ m ↘ PA.
+Notation "Γ ⊨ a ∈ A" := (SemWt Γ a A) (at level 70).
+
+(* Semantic context wellformedness *)
+Definition SemWff {n} Γ := forall (i : fin n), exists j, Γ ⊨ Γ i ∈ Univ j.
+Notation "⊨ Γ" := (SemWff Γ) (at level 70).
+
+Lemma ρ_ok_nil ρ :
+  ρ_ok null ρ.
+Proof.  rewrite /ρ_ok. inversion i; subst. Qed.
+
+Lemma ρ_ok_cons n i (Γ : fin n -> Tm n) ρ a PA A :
+  ⟦ subst_Tm ρ A ⟧ i ↘ PA -> PA a ->
+  ρ_ok Γ ρ ->
+  ρ_ok (funcomp (ren_Tm shift) (scons A Γ)) (funcomp (ren_Tm shift) (scons a ρ)).
