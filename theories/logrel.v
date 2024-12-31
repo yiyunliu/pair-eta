@@ -137,17 +137,17 @@ Proof.
 Qed.
 
 Lemma InterpExt_cumulative i j I (A : Tm 0) PA :
-  i < j ->
+  i <= j ->
    ⟦ A ⟧ i ;; I ↘ PA ->
    ⟦ A ⟧ j ;; I ↘ PA.
 Proof.
   move => h h0.
   elim : A PA /h0;
-    hauto l:on ctrs:InterpExt use:PeanoNat.Nat.lt_trans.
+    hauto l:on ctrs:InterpExt solve+:(by lia).
 Qed.
 
 Lemma InterpUnivN_cumulative i (A : Tm 0) PA :
-   ⟦ A ⟧ i ↘ PA -> forall j, i < j ->
+   ⟦ A ⟧ i ↘ PA -> forall j, i <= j ->
    ⟦ A ⟧ j ↘ PA.
 Proof.
   hauto l:on rew:db:InterpUniv use:InterpExt_cumulative.
@@ -289,6 +289,13 @@ Proof.
     eauto using join_transitive.
 Qed.
 
+Lemma InterpUniv_Join i (A B : Tm 0) PA PB :
+  ⟦ A ⟧ i ↘ PA ->
+  ⟦ B ⟧ i ↘ PB ->
+  join A B ->
+  PA = PB.
+Proof. hauto l:on use:InterpExt_Join rew:db:InterpUniv. Qed.
+
 Lemma InterpUniv_Bind_inv p i  (A : Tm 0) B P
   (h :  ⟦ TBind p A B ⟧ i ↘ P) :
   exists (PA : Tm 0 -> Prop) (PF : Tm 0 -> (Tm 0 -> Prop) -> Prop),
@@ -315,13 +322,25 @@ Lemma InterpUniv_Functional i (A : Tm 0) PA PB :
   PA = PB.
 Proof. hauto use:InterpExt_Functional rew:db:InterpUniv. Qed.
 
+Lemma InterpUniv_Join' i j (A B : Tm 0) PA PB :
+  ⟦ A ⟧ i ↘ PA ->
+  ⟦ B ⟧ j ↘ PB ->
+  join A B ->
+  PA = PB.
+Proof.
+  have [? ?] : i <= max i j /\ j <= max i j by lia.
+  move => hPA hPB.
+  have : ⟦ A ⟧ (max i j) ↘ PA by eauto using InterpUnivN_cumulative.
+  have : ⟦ B ⟧ (max i j) ↘ PB by eauto using InterpUnivN_cumulative.
+  eauto using InterpUniv_Join.
+Qed.
+
 Lemma InterpUniv_Functional' i j A PA PB :
   ⟦ A ⟧ i ↘ PA ->
   ⟦ A ⟧ j ↘ PB ->
   PA = PB.
 Proof.
-  have : i = j \/ i < j \/ j < i by lia.
-  qauto l:on use:InterpUnivN_cumulative, InterpUniv_Functional.
+  hauto l:on use:InterpUniv_Join', join_refl.
 Qed.
 
 Lemma InterpExt_Bind_inv_nopf i I p A B P (h :  ⟦TBind p A B ⟧ i ;; I ↘ P) :
@@ -492,4 +511,83 @@ Proof.
     exists k. change (Univ k) with (ren_Tm shift (Univ k : Tm n)).
     eauto using weakening_Sem.
   - hauto q:on use:weakening_Sem.
+Qed.
+
+(* Semantic typing rules *)
+Lemma ST_Var n Γ (i : fin n) :
+  ⊨ Γ ->
+  Γ ⊨ VarTm i ∈ Γ i.
+Proof.
+  move /(_ i) => [j /SemWt_Univ h].
+  rewrite /SemWt => ρ /[dup] hρ {}/h [S hS].
+  exists j, S.
+  asimpl. firstorder.
+Qed.
+
+Lemma ST_Bind n Γ i j p (A : Tm n) (B : Tm (S n)) :
+  Γ ⊨ A ∈ Univ i ->
+  funcomp (ren_Tm shift) (scons A Γ) ⊨ B ∈ Univ j ->
+  Γ ⊨ TBind p A B ∈ Univ (max i j).
+Proof.
+  move => /SemWt_Univ h0 /SemWt_Univ h1.
+  apply SemWt_Univ => ρ hρ.
+  move /h0 : (hρ){h0} => [S hS].
+  eexists => /=.
+  have ? : i <= Nat.max i j by lia.
+  apply InterpUnivN_Fun_nopf.
+  - eauto using InterpUnivN_cumulative.
+  - move => *. asimpl. hauto l:on use:InterpUnivN_cumulative, ρ_ok_cons.
+Qed.
+
+Lemma ST_Conv n Γ (a : Tm n) A B i :
+  Γ ⊨ a ∈ A ->
+  Γ ⊨ B ∈ Univ i ->
+  join A B ->
+  Γ ⊨ a ∈ B.
+Proof.
+  move => ha /SemWt_Univ h h0.
+  move => ρ hρ.
+  have {}h0 : join (subst_Tm ρ A) (subst_Tm ρ B) by eauto using join_substing.
+  move /ha : (hρ){ha} => [m [PA [h1 h2]]].
+  move /h : (hρ){h} => [S hS].
+  have ? : PA = S by eauto using InterpUniv_Join'. subst.
+  eauto.
+Qed.
+
+Lemma ST_Abs n Γ (a : Tm (S n)) A B i :
+  Γ ⊨ TBind TPi A B ∈ (Univ i) ->
+  funcomp (ren_Tm shift) (scons A Γ) ⊨ a ∈ B ->
+  Γ ⊨ Abs a ∈ TBind TPi A B.
+Proof.
+  rename a into b.
+  move /SemWt_Univ => + hb ρ hρ.
+  move /(_ _ hρ) => [PPi hPPi].
+  exists i, PPi. split => //.
+  simpl in hPPi.
+  move /InterpUniv_Bind_inv_nopf : hPPi.
+  move => [PA [hPA [hTot ?]]]. subst=>/=.
+  move => a PB ha. asimpl => hPB.
+  move : ρ_ok_cons (hPA) (hρ) (ha). repeat move/[apply].
+  move /hb.
+  intros (m & PB0 & hPB0 & hPB0').
+  replace PB0 with PB in * by hauto l:on use:InterpUniv_Functional'.
+  apply : InterpUniv_back_clos; eauto.
+  apply : RPar.AppAbs'; eauto using RPar.refl.
+  by asimpl.
+Qed.
+
+Lemma ST_App n Γ (b a : Tm n) A B :
+  Γ ⊨ b ∈ TBind TPi A B ->
+  Γ ⊨ a ∈ A ->
+  Γ ⊨ App b a ∈ subst_Tm (scons a VarTm) B.
+Proof.
+  move => hf hb ρ hρ.
+  move /(_ ρ hρ) : hf; intros (i & PPi & hPi & hf).
+  move /(_ ρ hρ) : hb; intros (j & PA & hPA & hb).
+  simpl in hPi.
+  move /InterpUniv_Bind_inv_nopf : hPi. intros (PA0 & hPA0 & hTot & ?). subst.
+  have ? : PA0 = PA by eauto using InterpUniv_Functional'. subst.
+  move  : hf (hb). move/[apply].
+  move : hTot hb. move/[apply].
+  asimpl. hauto lq:on.
 Qed.
