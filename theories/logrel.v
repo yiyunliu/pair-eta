@@ -635,6 +635,16 @@ Proof.
   apply : InterpUniv_back_clos_star; eauto.
 Qed.
 
+Lemma substing_RPar n m (A : Tm (S n)) ρ (B : Tm m) C :
+  RPar.R B C ->
+  RPar.R (subst_Tm (scons B ρ) A) (subst_Tm (scons C ρ) A).
+Proof. hauto lq:on inv:option use:RPar.morphing, RPar.refl. Qed.
+
+Lemma substing_RPars n m (A : Tm (S n)) ρ (B : Tm m) C :
+  rtc RPar.R B C ->
+  rtc RPar.R (subst_Tm (scons B ρ) A) (subst_Tm (scons C ρ) A).
+Proof. induction 1; hauto lq:on ctrs:rtc use:substing_RPar. Qed.
+
 Lemma ST_Proj2 n Γ (a : Tm n) A B :
   Γ ⊨ a ∈ TBind TSig A B ->
   Γ ⊨ Proj PR a ∈ subst_Tm (scons (Proj PL a) VarTm) B.
@@ -652,6 +662,9 @@ Proof.
   have hrr : RPar.R (Proj PR (Pair a0 b0)) b0 by hauto l:on use:RPar.ProjPair', RPar.refl.
   exists m, PB.
   asimpl. split.
-  - admit.
+  - have h : rtc RPar.R (Proj PL (subst_Tm ρ a)) a0 by eauto using @relations.rtc_r.
+    have {}h : rtc RPar.R (subst_Tm (scons (Proj PL (subst_Tm ρ a)) ρ) B) (subst_Tm (scons a0 ρ) B) by eauto using substing_RPars.
+    move : hPB. asimpl.
+    eauto using InterpUnivN_back_preservation_star.
   - hauto lq:on use:@relations.rtc_r, InterpUniv_back_clos_star.
-Admitted.
+Qed.
