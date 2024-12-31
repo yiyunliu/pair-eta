@@ -5,18 +5,19 @@ From Equations Require Import Equations.
 Require Import ssreflect ssrbool.
 Require Import Logic.PropExtensionality (propositional_extensionality).
 From stdpp Require Import relations (rtc(..), rtc_subrel).
-Definition ProdSpace {n} (PA : Tm n -> Prop)
-  (PF : Tm n -> (Tm n -> Prop) -> Prop) b : Prop :=
+Import Psatz.
+Definition ProdSpace (PA : Tm 0 -> Prop)
+  (PF : Tm 0 -> (Tm 0 -> Prop) -> Prop) b : Prop :=
   forall a PB, PA a -> PF a PB -> PB (App b a).
 
-Definition SumSpace {n} (PA : Tm n -> Prop)
-  (PF : Tm n -> (Tm n -> Prop) -> Prop) t : Prop :=
+Definition SumSpace (PA : Tm 0 -> Prop)
+  (PF : Tm 0 -> (Tm 0 -> Prop) -> Prop) t : Prop :=
   exists a b, rtc RPar.R t (Pair a b) /\ PA a /\ (forall PB, PF a PB -> PB b).
 
-Definition BindSpace {n} p := if p is TPi then @ProdSpace n else @SumSpace n.
+Definition BindSpace p := if p is TPi then ProdSpace else SumSpace.
 
 Reserved Notation "⟦ A ⟧ i ;; I ↘ S" (at level 70).
-Inductive InterpExt {n} i (I : forall n, nat -> Tm n -> Prop) : Tm n -> (Tm n -> Prop) -> Prop :=
+Inductive InterpExt i (I : nat -> Tm 0 -> Prop) : Tm 0 -> (Tm 0 -> Prop) -> Prop :=
 | InterpExt_Bind p A B PA PF :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, PF a PB) ->
@@ -25,7 +26,7 @@ Inductive InterpExt {n} i (I : forall n, nat -> Tm n -> Prop) : Tm n -> (Tm n ->
 
 | InterpExt_Univ j :
   j < i ->
-  ⟦ Univ j ⟧ i ;; I ↘ (I n j)
+  ⟦ Univ j ⟧ i ;; I ↘ (I j)
 
 | InterpExt_Step A A0 PA :
   RPar.R A A0 ->
@@ -33,25 +34,25 @@ Inductive InterpExt {n} i (I : forall n, nat -> Tm n -> Prop) : Tm n -> (Tm n ->
   ⟦ A ⟧ i ;; I ↘ PA
 where "⟦ A ⟧ i ;; I ↘ S" := (InterpExt i I A S).
 
-Lemma InterpExt_Univ' {n} i  I j (PF : Tm n -> Prop) :
-  PF = I n j ->
+Lemma InterpExt_Univ'  i  I j (PF : Tm 0 -> Prop) :
+  PF = I j ->
   j < i ->
   ⟦ Univ j ⟧ i ;; I ↘ PF.
 Proof. hauto lq:on ctrs:InterpExt. Qed.
 
 Infix "<?" := Compare_dec.lt_dec (at level 60).
 
-Equations InterpUnivN n (i : nat) : Tm n -> (Tm n -> Prop) -> Prop by wf i lt :=
-  InterpUnivN n i := @InterpExt n i
-                     (fun n j A =>
+Equations InterpUnivN (i : nat) : Tm 0 -> (Tm 0 -> Prop) -> Prop by wf i lt :=
+  InterpUnivN i := @InterpExt i
+                     (fun j A =>
                         match j <? i  with
-                        | left _ => exists PA, InterpUnivN n j A PA
+                        | left _ => exists PA, InterpUnivN  j A PA
                         | right _ => False
                         end).
-Arguments InterpUnivN {n}.
+Arguments InterpUnivN .
 
-Lemma InterpExt_lt_impl {n : nat} i I I' A (PA : Tm n -> Prop) :
-  (forall j, j < i -> I n j = I' n j) ->
+Lemma InterpExt_lt_impl i I I' A (PA : Tm 0 -> Prop) :
+  (forall j, j < i -> I j = I' j) ->
   ⟦ A ⟧ i ;; I ↘ PA ->
   ⟦ A ⟧ i ;; I' ↘ PA.
 Proof.
@@ -62,20 +63,20 @@ Proof.
   - hauto lq:on ctrs:InterpExt.
 Qed.
 
-Lemma InterpExt_lt_eq {n : nat} i I I' A (PA : Tm n -> Prop) :
-  (forall j, j < i -> I n j = I' n j) ->
+Lemma InterpExt_lt_eq i I I' A (PA : Tm 0 -> Prop) :
+  (forall j, j < i -> I j = I' j) ->
   ⟦ A ⟧ i ;; I ↘ PA =
   ⟦ A ⟧ i ;; I' ↘ PA.
 Proof.
   move => hI. apply propositional_extensionality.
-  have : forall j, j < i -> I' n j = I n j by sfirstorder.
+  have : forall j, j < i -> I' j = I j by sfirstorder.
   firstorder using InterpExt_lt_impl.
 Qed.
 
 Notation "⟦ A ⟧ i ↘ S" := (InterpUnivN i A S) (at level 70).
 
-Lemma InterpUnivN_nolt n i :
-  @InterpUnivN n i = @InterpExt n i (fun n j (A : Tm n) => exists PA, ⟦ A ⟧ j ↘ PA).
+Lemma InterpUnivN_nolt i :
+  InterpUnivN i = InterpExt i (fun j (A : Tm 0) => exists PA, ⟦ A ⟧ j ↘ PA).
 Proof.
   simp InterpUnivN.
   extensionality A. extensionality PA.
@@ -91,9 +92,9 @@ Lemma RPar_substone n (a b : Tm (S n)) (c : Tm n):
     RPar.R a b -> RPar.R (subst_Tm (scons c VarTm) a) (subst_Tm (scons c VarTm) b).
   Proof. hauto l:on inv:option use:RPar.substing, RPar.refl. Qed.
 
-Lemma InterpExt_Bind_inv n p i I (A : Tm n) B P
+Lemma InterpExt_Bind_inv p i I (A : Tm 0) B P
   (h :  ⟦ TBind p A B ⟧ i ;; I ↘ P) :
-  exists (PA : Tm n -> Prop) (PF : Tm n -> (Tm n -> Prop) -> Prop),
+  exists (PA : Tm 0 -> Prop) (PF : Tm 0 -> (Tm 0 -> Prop) -> Prop),
      ⟦ A ⟧ i ;; I ↘ PA /\
     (forall a, PA a -> exists PB, PF a PB) /\
     (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) /\
@@ -108,18 +109,18 @@ Proof.
     hauto lq:on ctrs:InterpExt use:RPar_substone.
 Qed.
 
-Lemma InterpExt_Univ_inv n i I j P
-  (h :  ⟦ @Univ n j  ⟧ i ;; I ↘ P) :
-  P = I n j /\ j < i.
+Lemma InterpExt_Univ_inv i I j P
+  (h :  ⟦ Univ j  ⟧ i ;; I ↘ P) :
+  P = I j /\ j < i.
 Proof.
   move : h.
-  move E : (@Univ n j) => T h. move : j E.
+  move E : (Univ j) => T h. move : j E.
   elim : T P /h => //.
   - hauto l:on.
   - hauto lq:on rew:off inv:RPar.R.
 Qed.
 
-Lemma InterpExt_Bind_nopf n p i I (A : Tm n) B PA  :
+Lemma InterpExt_Bind_nopf p i I (A : Tm 0) B PA  :
   ⟦ A ⟧ i ;; I ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘  PB) ->
   ⟦ TBind p A B ⟧ i ;; I ↘ (BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB)).
@@ -127,7 +128,7 @@ Proof.
   move => h0 h1. apply InterpExt_Bind =>//.
 Qed.
 
-Lemma InterpUnivN_Fun_nopf n p i (A : Tm n) B PA :
+Lemma InterpUnivN_Fun_nopf p i (A : Tm 0) B PA :
   ⟦ A ⟧ i ↘ PA ->
   (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) ->
   ⟦ TBind p A B ⟧ i ↘ (BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB)).
@@ -135,7 +136,7 @@ Proof.
   hauto l:on use:InterpExt_Bind_nopf rew:db:InterpUniv.
 Qed.
 
-Lemma InterpExt_cumulative n i j I (A : Tm n) PA :
+Lemma InterpExt_cumulative i j I (A : Tm 0) PA :
   i < j ->
    ⟦ A ⟧ i ;; I ↘ PA ->
    ⟦ A ⟧ j ;; I ↘ PA.
@@ -145,14 +146,14 @@ Proof.
     hauto l:on ctrs:InterpExt use:PeanoNat.Nat.lt_trans.
 Qed.
 
-Lemma InterpUnivN_cumulative n i (A : Tm n) PA :
+Lemma InterpUnivN_cumulative i (A : Tm 0) PA :
    ⟦ A ⟧ i ↘ PA -> forall j, i < j ->
    ⟦ A ⟧ j ↘ PA.
 Proof.
   hauto l:on rew:db:InterpUniv use:InterpExt_cumulative.
 Qed.
 
-Lemma InterpExt_preservation n i I (A : Tm n) B P (h : InterpExt i I A P) :
+Lemma InterpExt_preservation i I (A : Tm 0) B P (h : InterpExt i I A P) :
   RPar.R A B ->
   ⟦ B ⟧ i ;; I ↘ P.
 Proof.
@@ -170,32 +171,32 @@ Proof.
     hauto lq:on ctrs:InterpExt.
 Qed.
 
-Lemma InterpUnivN_preservation n i (A : Tm n) B P (h : ⟦ A ⟧ i ↘ P) :
+Lemma InterpUnivN_preservation i (A : Tm 0) B P (h : ⟦ A ⟧ i ↘ P) :
   RPar.R A B ->
   ⟦ B ⟧ i ↘ P.
 Proof. hauto l:on rew:db:InterpUnivN use: InterpExt_preservation. Qed.
 
-Lemma InterpExt_back_preservation_star n i I (A : Tm n) B P (h : ⟦ B ⟧ i ;; I ↘ P) :
+Lemma InterpExt_back_preservation_star i I (A : Tm 0) B P (h : ⟦ B ⟧ i ;; I ↘ P) :
   rtc RPar.R A B ->
   ⟦ A ⟧ i ;; I ↘ P.
 Proof. induction 1; hauto l:on ctrs:InterpExt. Qed.
 
-Lemma InterpExt_preservation_star n i I (A : Tm n) B P (h : ⟦ A ⟧ i ;; I ↘ P) :
+Lemma InterpExt_preservation_star i I (A : Tm 0) B P (h : ⟦ A ⟧ i ;; I ↘ P) :
   rtc RPar.R A B ->
   ⟦ B ⟧ i ;; I ↘ P.
 Proof. induction 1; hauto l:on use:InterpExt_preservation. Qed.
 
-Lemma InterpUnivN_preservation_star n i (A : Tm n) B P (h : ⟦ A ⟧ i ↘ P) :
+Lemma InterpUnivN_preservation_star i (A : Tm 0) B P (h : ⟦ A ⟧ i ↘ P) :
   rtc RPar.R A B ->
   ⟦ B ⟧ i ↘ P.
 Proof. hauto l:on rew:db:InterpUnivN use:InterpExt_preservation_star. Qed.
 
-Lemma InterpUnivN_back_preservation_star n i (A : Tm n) B P (h : ⟦ B ⟧ i ↘ P) :
+Lemma InterpUnivN_back_preservation_star i (A : Tm 0) B P (h : ⟦ B ⟧ i ↘ P) :
   rtc RPar.R A B ->
   ⟦ A ⟧ i ↘ P.
 Proof. hauto l:on rew:db:InterpUnivN use:InterpExt_back_preservation_star. Qed.
 
-Lemma InterpExtInv n i I (A : Tm n) PA :
+Lemma InterpExtInv i I (A : Tm 0) PA :
   ⟦ A ⟧ i ;; I ↘ PA ->
   exists B, hfb B /\ rtc RPar.R A B /\  ⟦ B ⟧ i ;; I ↘ PA.
 Proof.
@@ -209,17 +210,17 @@ Proof.
   - hauto lq:on ctrs:rtc.
 Qed.
 
-Lemma RPars_Pars {n} (A B : Tm n) :
+Lemma RPars_Pars  (A B : Tm 0) :
   rtc RPar.R A B ->
   rtc Par.R A B.
 Proof. hauto lq:on use:RPar_Par, rtc_subrel. Qed.
 
-Lemma RPars_join {n} (A B : Tm n) :
+Lemma RPars_join  (A B : Tm 0) :
   rtc RPar.R A B -> join A B.
 Proof. hauto lq:on ctrs:rtc use:RPars_Pars. Qed.
 
-Lemma bindspace_iff {n} p (PA : Tm n -> Prop) PF PF0 b  :
-  (forall (a : Tm n) (PB PB0 : Tm n -> Prop), PF a PB -> PF0 a PB0 -> PB = PB0) ->
+Lemma bindspace_iff  p (PA : Tm 0 -> Prop) PF PF0 b  :
+  (forall (a : Tm 0) (PB PB0 : Tm 0 -> Prop), PF a PB -> PF0 a PB0 -> PB = PB0) ->
   (forall a, PA a -> exists PB, PF a PB) ->
   (forall a, PA a -> exists PB0, PF0 a PB0) ->
   (BindSpace p PA PF b <-> BindSpace p PA PF0 b).
@@ -240,7 +241,7 @@ Proof.
     hauto lq:on rew:off.
 Qed.
 
-Lemma InterpExt_Join n i I (A B : Tm n) PA PB :
+Lemma InterpExt_Join i I (A B : Tm 0) PA PB :
   ⟦ A ⟧ i ;; I ↘ PA ->
   ⟦ B ⟧ i ;; I ↘ PB ->
   join A B ->
@@ -280,7 +281,7 @@ Proof.
       exfalso.
       eauto using join_univ_pi_contra.
     + move => m _ [/RPars_join h0 + h1].
-      have /join_univ_inj {h0 h1} ?  : join (Univ j : Tm n) (Univ m) by eauto using join_transitive.
+      have /join_univ_inj {h0 h1} ?  : join (Univ j : Tm 0) (Univ m) by eauto using join_transitive.
       subst.
       move /InterpExt_Univ_inv. firstorder.
   - move => A A0 PA h.
@@ -288,34 +289,43 @@ Proof.
     eauto using join_transitive.
 Qed.
 
-Lemma InterpUniv_Bind_inv n p i  (A : Tm n) B P
+Lemma InterpUniv_Bind_inv p i  (A : Tm 0) B P
   (h :  ⟦ TBind p A B ⟧ i ↘ P) :
-  exists (PA : Tm n -> Prop) (PF : Tm n -> (Tm n -> Prop) -> Prop),
+  exists (PA : Tm 0 -> Prop) (PF : Tm 0 -> (Tm 0 -> Prop) -> Prop),
      ⟦ A ⟧ i ↘ PA /\
     (forall a, PA a -> exists PB, PF a PB) /\
     (forall a PB, PF a PB -> ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) /\
     P = BindSpace p PA PF.
 Proof. hauto l:on use:InterpExt_Bind_inv rew:db:InterpUniv. Qed.
 
-Lemma InterpUniv_Univ_inv n i j P
-  (h :  ⟦ @Univ n j  ⟧ i ↘ P) :
-  P = (fun (A : Tm n) => exists PA, ⟦ A ⟧ j ↘ PA) /\ j < i.
+Lemma InterpUniv_Univ_inv i j P
+  (h :  ⟦ Univ j  ⟧ i ↘ P) :
+  P = (fun (A : Tm 0) => exists PA, ⟦ A ⟧ j ↘ PA) /\ j < i.
 Proof. hauto l:on use:InterpExt_Univ_inv rew:db:InterpUniv. Qed.
 
-Lemma InterpExt_Functional n i I (A B : Tm n) PA PB :
+Lemma InterpExt_Functional i I (A B : Tm 0) PA PB :
   ⟦ A ⟧ i ;; I ↘ PA ->
   ⟦ A ⟧ i ;; I ↘ PB ->
   PA = PB.
 Proof. hauto use:InterpExt_Join, join_refl. Qed.
 
-Lemma InterpUniv_Functional n i (A B : Tm n) PA PB :
+Lemma InterpUniv_Functional i (A : Tm 0) PA PB :
   ⟦ A ⟧ i ↘ PA ->
   ⟦ A ⟧ i ↘ PB ->
   PA = PB.
 Proof. hauto use:InterpExt_Functional rew:db:InterpUniv. Qed.
 
-Lemma InterpExt_Bind_inv_nopf n i I p A B P (h :  ⟦TBind p A B ⟧ i ;; I ↘ P) :
-  exists (PA : Tm n -> Prop),
+Lemma InterpUniv_Functional' i j A PA PB :
+  ⟦ A ⟧ i ↘ PA ->
+  ⟦ A ⟧ j ↘ PB ->
+  PA = PB.
+Proof.
+  have : i = j \/ i < j \/ j < i by lia.
+  qauto l:on use:InterpUnivN_cumulative, InterpUniv_Functional.
+Qed.
+
+Lemma InterpExt_Bind_inv_nopf i I p A B P (h :  ⟦TBind p A B ⟧ i ;; I ↘ P) :
+  exists (PA : Tm 0 -> Prop),
      ⟦ A ⟧ i ;; I ↘ PA /\
     (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB) /\
       P = BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ;; I ↘ PB).
@@ -336,15 +346,15 @@ Proof.
       split; hauto q:on use:InterpExt_Functional.
 Qed.
 
-Lemma InterpUniv_Bind_inv_nopf n i p A B P (h :  ⟦TBind p A B ⟧ i ↘ P) :
-  exists (PA : Tm n -> Prop),
+Lemma InterpUniv_Bind_inv_nopf i p A B P (h :  ⟦TBind p A B ⟧ i ↘ P) :
+  exists (PA : Tm 0 -> Prop),
      ⟦ A ⟧ i ↘ PA /\
     (forall a, PA a -> exists PB, ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB) /\
       P = BindSpace p PA (fun a PB => ⟦ subst_Tm (scons a VarTm) B ⟧ i ↘ PB).
 Proof. hauto l:on use:InterpExt_Bind_inv_nopf rew:db:InterpUniv. Qed.
 
-Lemma InterpExt_back_clos n i I (A : Tm n) PA :
-  (forall j,  forall a b, (RPar.R a b) ->  I n j b -> I n j a) ->
+Lemma InterpExt_back_clos i I (A : Tm 0) PA :
+  (forall j,  forall a b, (RPar.R a b) ->  I j b -> I j a) ->
     ⟦ A ⟧ i ;; I ↘ PA ->
     forall a b, (RPar.R a b) ->
            PA b -> PA a.
@@ -361,7 +371,7 @@ Proof.
   - eauto.
 Qed.
 
-Lemma InterpUniv_back_clos n i (A : Tm n) PA :
+Lemma InterpUniv_back_clos i (A : Tm 0) PA :
     ⟦ A ⟧ i ↘ PA ->
     forall a b, (RPar.R a b) ->
            PA b -> PA a.
@@ -371,7 +381,7 @@ Proof.
   hauto lq:on ctrs:rtc use:InterpUnivN_back_preservation_star.
 Qed.
 
-Lemma InterpUniv_back_clos_star n i (A : Tm n) PA :
+Lemma InterpUniv_back_clos_star i (A : Tm 0) PA :
     ⟦ A ⟧ i ↘ PA ->
     forall a b, rtc RPar.R a b ->
            PA b -> PA a.
@@ -381,10 +391,10 @@ Proof.
   hauto lq:on use:InterpUniv_back_clos.
 Qed.
 
-Definition ρ_ok {n} Γ (ρ : fin n -> Tm n) := forall i m PA,
-  ⟦ Γ i ⟧ m ↘ PA -> PA (ρ i).
+Definition ρ_ok {n} Γ (ρ : fin n -> Tm 0) := forall i m PA,
+  ⟦ subst_Tm ρ (Γ i) ⟧ m ↘ PA -> PA (ρ i).
 
-Definition SemWt {n} Γ (a A : Tm n) := forall ρ, ρ_ok Γ ρ -> forall (i : fin n), exists m PA, ⟦ subst_Tm ρ (Γ i) ⟧ m ↘ PA.
+Definition SemWt {n} Γ (a A : Tm n) := forall ρ, ρ_ok Γ ρ -> exists m PA, ⟦ subst_Tm ρ A ⟧ m ↘ PA /\ PA (subst_Tm ρ a).
 Notation "Γ ⊨ a ∈ A" := (SemWt Γ a A) (at level 70).
 
 (* Semantic context wellformedness *)
@@ -398,4 +408,46 @@ Proof.  rewrite /ρ_ok. inversion i; subst. Qed.
 Lemma ρ_ok_cons n i (Γ : fin n -> Tm n) ρ a PA A :
   ⟦ subst_Tm ρ A ⟧ i ↘ PA -> PA a ->
   ρ_ok Γ ρ ->
-  ρ_ok (funcomp (ren_Tm shift) (scons A Γ)) (funcomp (ren_Tm shift) (scons a ρ)).
+  ρ_ok (funcomp (ren_Tm shift) (scons A Γ)) ((scons a ρ)).
+Proof.
+  move => h0 h1 h2.
+  rewrite /ρ_ok.
+  move => j.
+  destruct j as [j|].
+  - move => m PA0. asimpl => ?.
+    firstorder.
+  - move => m PA0. asimpl => h3.
+    have ? : PA0 = PA by eauto using InterpUniv_Functional'.
+    by subst.
+Qed.
+
+Definition renaming_ok {n m} (Γ : fin n -> Tm n) (Δ : fin m -> Tm m) (ξ : fin m -> fin n) :=
+  forall (i : fin m), ren_Tm ξ (Δ i) = Γ (ξ i).
+
+Lemma ρ_ok_renaming n m (Γ : fin n -> Tm n) ρ :
+  forall (Δ : fin m -> Tm m) ξ,
+    renaming_ok Γ Δ ξ ->
+    ρ_ok Γ ρ ->
+    ρ_ok Δ (funcomp ρ ξ).
+Proof.
+  move => Δ ξ hξ hρ.
+  rewrite /ρ_ok => i m' PA.
+  rewrite /renaming_ok in hξ.
+  rewrite /ρ_ok in hρ.
+  move => h.
+  rewrite /funcomp.
+  apply hρ with (m := m').
+  move : h. rewrite -hξ.
+  by asimpl.
+Qed.
+
+Lemma renaming_SemWt {n} Γ a A :
+  Γ ⊨ a ∈ A ->
+  forall {m} Δ (ξ : fin n -> fin m),
+    renaming_ok Δ Γ ξ ->
+    Δ ⊨ ren_Tm ξ a ∈ ren_Tm ξ A.
+Proof.
+  rewrite /SemWt => h m Δ ξ hξ ρ hρ.
+  have /h hρ' : (ρ_ok Γ (funcomp ρ ξ)) by eauto using ρ_ok_renaming.
+  hauto q:on solve+:(by asimpl).
+Qed.
