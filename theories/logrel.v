@@ -591,3 +591,67 @@ Proof.
   move : hTot hb. move/[apply].
   asimpl. hauto lq:on.
 Qed.
+
+Lemma ST_Pair n Γ (a b : Tm n) A B i :
+  Γ ⊨ TBind TSig A B ∈ (Univ i) ->
+  Γ ⊨ a ∈ A ->
+  Γ ⊨ b ∈ subst_Tm (scons a VarTm) B ->
+  Γ ⊨ Pair a b ∈ TBind TSig A B.
+Proof.
+  move /SemWt_Univ => + ha hb ρ hρ.
+  move /(_ _ hρ) => [PPi hPPi].
+  exists i, PPi. split => //.
+  simpl in hPPi.
+  move /InterpUniv_Bind_inv_nopf : hPPi.
+  move => [PA [hPA [hTot ?]]]. subst=>/=.
+  rewrite /SumSpace.
+  exists (subst_Tm ρ a), (subst_Tm ρ b).
+  split.
+  - hauto l:on use:Pars.substing.
+  - move /ha : (hρ){ha}.
+    move => [m][PA0][h0]h1.
+    move /hb : (hρ){hb}.
+    move => [k][PB][h2]h3.
+    have ? : PA0 = PA by eauto using InterpUniv_Functional'. subst.
+    split => // PB0.
+    move : h2. asimpl => *.
+    have ? : PB0 = PB by eauto using InterpUniv_Functional'. by subst.
+Qed.
+
+Lemma ST_Proj1 n Γ (a : Tm n) A B :
+  Γ ⊨ a ∈ TBind TSig A B ->
+  Γ ⊨ Proj PL a ∈ A.
+Proof.
+  move => h ρ /[dup]hρ {}/h [m][PA][/= /InterpUniv_Bind_inv_nopf h0]h1.
+  move : h0 => [S][h2][h3]?. subst.
+  move : h1 => /=.
+  rewrite /SumSpace.
+  move => [a0 [b0 [h4 [h5 h6]]]].
+  exists m, S. split => //=.
+  have {}h4 : rtc RPar.R (Proj PL (subst_Tm ρ a)) (Proj PL (Pair a0 b0)) by eauto using RPars.ProjCong.
+  have ? : RPar.R (Proj PL (Pair a0 b0)) a0 by hauto l:on use:RPar.refl, RPar.ProjPair'.
+  have : rtc RPar.R (Proj PL (subst_Tm ρ a)) a0 by eauto using @relations.rtc_r.
+  move => h.
+  apply : InterpUniv_back_clos_star; eauto.
+Qed.
+
+Lemma ST_Proj2 n Γ (a : Tm n) A B :
+  Γ ⊨ a ∈ TBind TSig A B ->
+  Γ ⊨ Proj PR a ∈ subst_Tm (scons (Proj PL a) VarTm) B.
+Proof.
+  move => h ρ hρ.
+  move : (hρ) => {}/h [m][PA][/= /InterpUniv_Bind_inv_nopf h0]h1.
+  move : h0 => [S][h2][h3]?. subst.
+  move : h1 => /=.
+  rewrite /SumSpace.
+  move => [a0 [b0 [h4 [h5 h6]]]].
+  specialize h3 with (1 := h5).
+  move : h3 => [PB hPB].
+  have hr : forall p, rtc RPar.R (Proj p (subst_Tm ρ a)) (Proj p (Pair a0 b0)) by eauto using RPars.ProjCong.
+  have hrl : RPar.R (Proj PL (Pair a0 b0)) a0 by hauto l:on use:RPar.ProjPair', RPar.refl.
+  have hrr : RPar.R (Proj PR (Pair a0 b0)) b0 by hauto l:on use:RPar.ProjPair', RPar.refl.
+  exists m, PB.
+  asimpl. split.
+  - admit.
+  - hauto lq:on use:@relations.rtc_r, InterpUniv_back_clos_star.
+Admitted.
