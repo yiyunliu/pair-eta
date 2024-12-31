@@ -451,3 +451,45 @@ Proof.
   have /h hρ' : (ρ_ok Γ (funcomp ρ ξ)) by eauto using ρ_ok_renaming.
   hauto q:on solve+:(by asimpl).
 Qed.
+
+Lemma weakening_Sem n Γ (a : Tm n) A B i
+  (h0 : Γ ⊨ B ∈ Univ i)
+  (h1 : Γ ⊨ a ∈ A) :
+   funcomp (ren_Tm shift) (scons B Γ) ⊨ ren_Tm shift a ∈ ren_Tm shift A.
+Proof.
+  apply : renaming_SemWt; eauto.
+  hauto lq:on inv:option unfold:renaming_ok.
+Qed.
+
+Lemma SemWt_Univ n Γ (A : Tm n) i  :
+  Γ ⊨ A ∈ Univ i <->
+  forall ρ, ρ_ok Γ ρ -> exists S, ⟦ subst_Tm ρ A ⟧ i ↘ S.
+Proof.
+  rewrite /SemWt.
+  split.
+  - hauto lq:on rew:off use:InterpUniv_Univ_inv.
+  - move => /[swap] ρ /[apply].
+    move => [PA hPA].
+    exists (S i). eexists.
+    split.
+    + simp InterpUniv. apply InterpExt_Univ. lia.
+    + simpl. eauto.
+Qed.
+
+(* Structural laws for Semantic context wellformedness *)
+Lemma SemWff_nil : SemWff null.
+Proof. case. Qed.
+
+Lemma SemWff_cons n Γ (A : Tm n) i :
+    ⊨ Γ ->
+    Γ ⊨ A ∈ Univ i ->
+    (* -------------- *)
+    ⊨ funcomp (ren_Tm shift) (scons A Γ).
+Proof.
+  move => h h0.
+  move => j. destruct j as [j|].
+  - move /(_ j) : h => [k hk].
+    exists k. change (Univ k) with (ren_Tm shift (Univ k : Tm n)).
+    eauto using weakening_Sem.
+  - hauto q:on use:weakening_Sem.
+Qed.
