@@ -1064,6 +1064,7 @@ Definition prov_univ {n} i0 (a : Tm n) :=
 (* Can consider combine prov and provU *)
 #[tactic="prov_tac"]Equations prov {n} (h : Tm n) (a : Tm n) : Prop by wf (depth_tm a) lt :=
   prov h (TBind p0 A0 B0) := prov_bind p0 A0 B0 h;
+ (* Try forall b, prov h (a {b /x})? *)
   prov h (Abs a) := prov (ren_Tm shift h) a;
   prov h (App a b) := prov h a;
   prov h (Pair a b) := prov h a /\ prov h b;
