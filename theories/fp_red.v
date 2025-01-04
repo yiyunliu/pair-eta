@@ -1132,6 +1132,31 @@ Qed.
 Lemma prov_antiren n m (ξ : fin n -> fin m) h a:
   prov (ren_Tm ξ h) a -> exists a', ren_Tm ξ a' = a /\ prov h a'.
 Proof.
+  move E : (ren_Tm ξ h) => H.
+  move : ξ H E.
+  elim : m / a => m.
+  - move => i ξ H ?. subst. simp prov.
+    case : h => //=.
+    move => j [?]. subst.
+    exists (VarTm j). firstorder.
+  - move => a iha ξ ? ?. subst.
+    simp prov.
+    asimpl.
+    move => {}/iha iha.
+    specialize iha with (1 := eq_refl).
+    move : iha => [a' [h1 h2]]. subst.
+    exists (Abs (ren_Tm shift a')).
+    split. by asimpl.
+    simp prov. hauto lq:on use:prov_ren.
+  - move => a iha b ihb ξ ? ?. subst.
+    simp prov.
+    move /iha. move/(_ ξ eq_refl) => [a' [? ?]] {iha ihb}. subst.
+    (* Doesn't hold *)
+    have : exists b', ren_Tm ξ b' = b by admit.
+    move => [b' ?]. subst.
+    exists (App a' b').
+    split => //=.
+    simp prov.
 Admitted.
 
 (* Lemma ren_hfb {n m} (ξ : fin n -> fin m) u  : hfb (ren_Tm ξ u) = hfb u. *)
