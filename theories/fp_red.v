@@ -375,6 +375,62 @@ Module RPar.
   Qed.
 End RPar.
 
+Module ERed.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (****************** Eta ***********************)
+  | AppEta a :
+    R a (Abs (App (ren_Tm shift a) (VarTm var_zero)))
+  | PairEta a :
+    R a (Pair (Proj PL a) (Proj PR a))
+
+  (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
+  | AppCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App a0 b0) (App a1 b1)
+  | PairCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Pair a0 b0) (Pair a1 b1)
+  | ProjCong p a0 a1 :
+    R a0 a1 ->
+    R (Proj p a0) (Proj p a1)
+  | BindCong p A0 A1 B0 B1:
+    R A0 A1 ->
+    R B0 B1 ->
+    R (TBind p A0 B0) (TBind p A1 B1).
+
+  Lemma AppEta' n a (u : Tm n) :
+    u = (Abs (App (ren_Tm shift a) (VarTm var_zero))) ->
+    R a u.
+  Proof. move => ->. apply AppEta. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h.
+
+    move => n a m ξ.
+    apply AppEta'. by asimpl.
+    all : qauto ctrs:R.
+  Qed.
+
+  Lemma substing n m (a : Tm n) b (ρ : fin n -> Tm m) :
+    R a b ->
+    R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof.
+    move => h. move : m ρ. elim : n a b / h => n.
+    move => a m ρ /=.
+    apply : AppEta'; eauto. by asimpl.
+    all : hauto ctrs:R inv:option use:renaming.
+  Qed.
+
+End ERed.
+
 Module EPar.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
   (****************** Eta ***********************)
@@ -1084,6 +1140,11 @@ Inductive prov {n} : Tm n -> Tm n -> Prop :=
 | P_Univ i :
   prov (Univ i) (Univ i).
 
+Lemma ERed_EPar n (a b : Tm n) : ERed.R a b -> EPar.R a b.
+Proof.
+  induction 1; hauto lq:on ctrs:EPar.R use:EPar.refl.
+Qed.
+
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof.
   move => h. elim : n a b /h; qauto ctrs:Par.R.
@@ -1126,35 +1187,74 @@ Proof.
   - hauto l:on ctrs:RPar.R inv:RPar.R.
 Qed.
 
-Lemma prov_epar n (u : Tm n) a b : prov u a -> EPar.R a b -> prov u b.
+Lemma prov_oexp n (u : Tm n) a b : prov u a -> OExp.R a b -> prov u b.
 Proof.
   move => + h. move : u.
-  elim : n a b /h => n.
-  - move => a0 a1 ha iha u ha0.
-    constructor.
-    move => b. asimpl.
-    hauto lq:on ctrs:prov.
-  - move => a0 a1 ha iha u hu.
-    constructor.
+  case : a b / h.
+  - move => a u h.
+    constructor. move => b. asimpl. by constructor.
+  - move => a u h. by do 2 constructor.
+Qed.
 
-
-Lemma prov_par_pi n p h (A : Tm n) B C : prov h (TBind p A B) -> Par.R (TBind p A B) C -> prov h C.
+Lemma prov_oexps n (u : Tm n) a b : prov u a -> rtc OExp.R a b -> prov u b.
 Proof.
-  move E : (TBind p A B) => T + h0.
-  move : p h A B E.
-  elim : n T C /h0 => //=.
-  - move => n a0 a1 ha iha p h A B ?. subst.
-    specialize iha with (1 := eq_refl).
-    move => {}/iha.
-    move => h0.
-    constructor.
-    move => ?. asimpl. by constructor.
-  -
+  induction 2; sfirstorder use:prov_oexp.
+Qed.
 
-Lemma prov_par n (u : Tm n) a b : prov u a -> hfb u -> Par.R a b -> prov u b.
+Lemma prov_lam n (u : Tm n) a : prov u a <-> prov u (Abs (App (ren_Tm shift a) (VarTm var_zero))).
 Proof.
-  move => + + h. move : u.
-  elim : n a b /h => //=.
+  split.
+  move => h. constructor. move => b. asimpl. by constructor.
+  inversion 1; subst.
+  specialize H2 with (b := Bot).
+  move : H2. asimpl. inversion 1; subst. done.
+Qed.
+
+Lemma prov_pair n (u : Tm n) a : prov u a <-> prov u (Pair (Proj PL a) (Proj PR a)).
+Proof. hauto lq:on inv:prov ctrs:prov. Qed.
+
+Derive Dependent Inversion inv with (forall n (a b : Tm n), ERed.R a b) Sort Prop.
+
+Lemma prov_ered n (u : Tm n) a b : prov u a -> ERed.R a b -> prov u b.
+Proof.
+  move => h.
+  move : b.
+  elim : u a / h.
+  - move => p A A0 B B0 hA hB b.
+    elim /inv => // _.
+    + move => a0 *. subst.
+      rewrite -prov_lam.
+      by constructor.
+    + move => a0 *. subst.
+      rewrite -prov_pair.
+      by constructor.
+    + move => p0 A1 A2 B1 B2 h0 h1 [*]. subst.
+      qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
+  - move => h a ha iha b.
+    elim /inv => // _.
+    + move => a0 *. subst.
+      rewrite -prov_lam.
+      by constructor.
+    + move => a0 *. subst.
+      rewrite -prov_pair.
+      by constructor.
+    + move => a0 a1 h0 [*]. subst.
+      constructor. eauto using ERed.substing.
+  - hauto lq:on inv:ERed.R, prov ctrs:prov.
+  - move => h a b ha iha hb ihb b0.
+    elim /inv => //_.
+    + move => a0 *. subst.
+      rewrite -prov_lam.
+      by constructor.
+    + move => a0 *. subst.
+      rewrite -prov_pair.
+      by constructor.
+    + hauto lq:on ctrs:prov.
+  - hauto lq:on inv:ERed.R, prov ctrs:prov.
+  - hauto lq:on inv:ERed.R, prov ctrs:prov.
+  - hauto lq:on inv:ERed.R, prov ctrs:prov.
+  - hauto lq:on inv:ERed.R, prov ctrs:prov.
+Qed.
 
 (* Can consider combine prov and provU *)
 Fixpoint prov {n} (h : Tm n) (a : Tm n) : Prop :=
