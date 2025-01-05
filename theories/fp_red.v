@@ -1256,19 +1256,6 @@ Proof.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
 Qed.
 
-(* Can consider combine prov and provU *)
-Fixpoint prov {n} (h : Tm n) (a : Tm n) : Prop :=
-  match a with
-  | (TBind p0 A0 B0) => prov_bind p0 A0 B0 h
-  | (Abs a) => prov (ren_Tm shift h) a
-  | (App a b) => prov h a
-  | (Pair a b) => prov h a /\ prov h b
-  | (Proj p a) => prov h a
-  | Bot => False
-  | VarTm _ => False
-  | Univ i => prov_univ i h
-  end.
-
 Fixpoint extract {n} (a : Tm n) : Tm n :=
   match a with
   | TBind p A B => TBind p A B
@@ -1297,120 +1284,60 @@ Proof.
   - sfirstorder.
 Qed.
 
-Lemma prov_bind_ren n m p (A : Tm n) B (ξ : fin n -> fin m) a  :
-  prov_bind p A B a ->
-  prov_bind p (ren_Tm ξ A) (ren_Tm (upRen_Tm_Tm ξ) B) (ren_Tm ξ a).
+Lemma ren_morphing n m (a : Tm n) (ρ : fin n -> Tm m) :
+  (forall i, ρ i = extract (ρ i)) ->
+  extract (subst_Tm ρ a) = subst_Tm ρ (extract a).
 Proof.
-  case : a => //=.
-  hauto l:on use:Pars.renaming.
-Qed.
-
-Lemma prov_ren n m (ξ : fin n -> fin m) h a :
-  prov h a -> prov (ren_Tm ξ h) (ren_Tm ξ a).
-Proof.
-  move : m ξ h. elim : n / a => //=.
-  - move => n a ih m ξ h.
-    move /ih => {ih}.
-    move /(_ _ (upRen_Tm_Tm ξ)) => /=.
-    move => h0.
-    suff  : ren_Tm (upRen_Tm_Tm ξ) (ren_Tm shift h) = ren_Tm shift (ren_Tm ξ h) by move => <-.
-    clear.
-    case : h => * /=; by asimpl.
-  - hauto l:on.
-  - hauto l:on use:prov_bind_ren.
-  - hauto lq:on inv:Tm.
-Qed.
-
-Definition hfb {n} (a : Tm n) :=
-  match a with
-  | TBind _ _ _ => true
-  | Univ _ => true
-  | _ => false
-  end.
-
-Lemma prov_morph n m (ρ : fin n -> Tm m) h a :
-  prov h a ->
-  hfb h ->
-  prov (subst_Tm ρ h) (subst_Tm ρ a).
-Proof.
-  move : m ρ h. elim : n / a => //=.
-  - move => n a ih m ρ h + hb.
-    move /ih => {ih}.
-    move /(_ _ (up_Tm_Tm ρ) ltac:(hauto lq:on inv:Tm)).
+  move : m ρ.
+  elim : n /a => n //=.
+  move => a ha m ρ hi.
+  rewrite ha.
+  - destruct i as [i|] => //.
+    rewrite ren_extract.
+    rewrite -hi.
     by asimpl.
-  - hauto q:on.
-  - move => n p A ihA B ihB m ρ h /=. move => //= + h0.
-    case : h h0 => //=.
-    move => p0 A0 B0 _ [? [h1 h2]]. subst.
-    hauto l:on use:Pars.substing.
-  - hauto l:on inv:Tm.
+  - by asimpl.
 Qed.
 
-Lemma ren_hfb {n m} (ξ : fin n -> fin m) u  : hfb (ren_Tm ξ u) = hfb u.
-Proof. move : m ξ. elim : n /u =>//=. Qed.
-
-Hint Rewrite @ren_hfb : prov.
-
-Lemma prov_par n (u : Tm n) a b : prov u a -> hfb u -> Par.R a b -> prov u b.
+Lemma ren_subst_bot n (a : Tm (S n)) :
+  extract (subst_Tm (scons Bot VarTm) a) = subst_Tm (scons Bot VarTm) (extract a).
 Proof.
-  move => + + h. move : u.
-  elim : n a b /h => //=.
-  - move => n a0 a1 b0 b1 ha iha hb ihb u /= h h0.
-    have h1 : hfb (ren_Tm shift u) by eauto using ren_hfb.
-    move /iha /(_ h1) : h.
-    move /(prov_morph _ _ (scons b1 VarTm)) /(_ h1).
-    by asimpl.
-  - hauto lq:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - move => n a0 a1 ha iha A B. move /iha.
-    hauto l:on use:prov_ren.
-  - hauto l:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto l:on rew:db:prov.
-  - move => n p A0 A1 B0 B1 hA ihA hB ihB u.
-    case : u => //=.
-    move => p0 A B [? [h2 h3]]. subst.
-    move => ?. repeat split => //=;
-    hauto l:on use:rtc_r rew:db:prov.
-Qed.
-
-Lemma prov_pars n (u : Tm n) a b : hfb u -> prov u a -> rtc Par.R a b -> prov u b.
-Proof.
-  induction 3; hauto lq:on ctrs:rtc use:prov_par.
+  apply ren_morphing. destruct i as [i|] => //=.
 Qed.
 
 Definition prov_extract_spec {n} u (a : Tm n) :=
   match u with
   | TBind p A B => exists A0 B0, extract a = TBind p A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0
   | Univ i => extract a = Univ i
+  | VarTm i => extract a = VarTm i
   | _ => True
   end.
 
 Lemma prov_extract n u (a : Tm n) :
   prov u a -> prov_extract_spec u a.
 Proof.
-  move : u. elim : n / a => //=.
-  - move => n a ih [] //=.
-    + move => p A B /=.
-      move /ih {ih}.
-      simpl.
-      move => [A0[B0[h [h0 h1]]]].
-      have : exists A1, rtc Par.R A A1 /\ ren_Tm shift A1 = A0
-          by hauto l:on use:Pars.antirenaming.
-      move => [A1 [h3 h4]].
-      have : exists B1, rtc Par.R B B1 /\ ren_Tm (upRen_Tm_Tm shift) B1 = B0
-          by hauto l:on use:Pars.antirenaming.
-      move => [B1 [h5 h6]].
-      subst.
-      have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
-                    subst_Tm (scons Bot VarTm) (ren_Tm shift (TBind p A1 B1)) by sauto lq:on.
-      move : h0. asimpl.
-      hauto lq:on.
-    + hauto q:on.
-  - hauto lq:on rew:off inv:Tm rew:db:prov.
-  - hauto inv:Tm l:on rew:db:prov.
-  - hauto l:on inv:Tm rew:db:prov.
+  move => h.
+  elim : u a /h.
+  - sfirstorder.
+  - move => h a ha ih.
+    case : h ha ih => //=.
+    + move => i ha ih.
+      move /(_ Bot) in ih.
+      rewrite -ih.
+      by rewrite ren_subst_bot.
+    + move => p A B h ih.
+      move /(_ Bot) : ih => [A0][B0][h0][h1]h2.
+      rewrite ren_subst_bot in h0.
+      rewrite h0.
+      eauto.
+    + move => i h /(_ Bot).
+      by rewrite ren_subst_bot => ->.
+  - hauto lq:on.
+  - hauto lq:on.
+  - hauto lq:on.
+  - sfirstorder.
+  - sfirstorder.
+  - sfirstorder.
 Qed.
 
 Definition union {A : Type} (R0 R1 : A -> A -> Prop) a b :=
