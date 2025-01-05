@@ -1214,9 +1214,14 @@ Proof.
   move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
 Qed.
 
-Lemma rtc_idem n (a b : Tm n) : rtc (rtc EPar.R) a b -> rtc EPar.R a b.
+Lemma rtc_idem n (R : Tm n -> Tm n -> Prop) (a b : Tm n) : rtc (rtc R) a b -> rtc R a b.
 Proof.
   induction 1; hauto l:on use:@relations.rtc_transitive, @rtc_r.
+Qed.
+
+Lemma EPars_EReds {n} (a b : Tm n) : rtc EPar.R a b <-> rtc ERed.R a b.
+Proof.
+  sfirstorder use:@relations.rtc_subrel, EPar_ERed, rtc_idem, ERed_EPar.
 Qed.
 
 Lemma prov_rpar n (u : Tm n) a b : prov u a -> RPar.R a b -> prov u b.
@@ -1251,19 +1256,6 @@ Proof.
   - hauto l:on ctrs:RPar.R inv:RPar.R.
 Qed.
 
-Lemma prov_oexp n (u : Tm n) a b : prov u a -> OExp.R a b -> prov u b.
-Proof.
-  move => + h. move : u.
-  case : a b / h.
-  - move => a u h.
-    constructor. move => b. asimpl. by constructor.
-  - move => a u h. by do 2 constructor.
-Qed.
-
-Lemma prov_oexps n (u : Tm n) a b : prov u a -> rtc OExp.R a b -> prov u b.
-Proof.
-  induction 2; sfirstorder use:prov_oexp.
-Qed.
 
 Lemma prov_lam n (u : Tm n) a : prov u a <-> prov u (Abs (App (ren_Tm shift a) (VarTm var_zero))).
 Proof.
@@ -1318,6 +1310,11 @@ Proof.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
+Qed.
+
+Lemma prov_ereds n (u : Tm n) a b : prov u a -> rtc ERed.R a b -> prov u b.
+Proof.
+  induction 2; sfirstorder use:prov_ered.
 Qed.
 
 Fixpoint extract {n} (a : Tm n) : Tm n :=
@@ -1730,6 +1727,24 @@ Proof.
       sfirstorder.
 Qed.
 
+Lemma prov_erpar n (u : Tm n) a b : prov u a -> ERPar.R a b -> prov u b.
+Proof.
+  move => h [].
+  - sfirstorder use:prov_rpar.
+  - move /EPar_ERed.
+    sfirstorder use:prov_ereds.
+Qed.
+
+Lemma prov_pars n (u : Tm n) a b : prov u a -> rtc Par.R a b -> prov u b.
+Proof.
+  move => h /Pars_ERPar.
+  move => h0.
+  move  : h.
+  elim : a b /h0.
+  - done.
+  - hauto lq:on use:prov_erpar.
+Qed.
+
 Lemma Par_confluent n (a b c : Tm n) :
   rtc Par.R a b ->
   rtc Par.R a c ->
@@ -1762,8 +1777,7 @@ Lemma pars_univ_inv n i (c : Tm n) :
 Proof.
   have : prov (Univ i) (Univ i : Tm n) by sfirstorder.
   move : prov_pars. repeat move/[apply].
-  move /(_ ltac:(reflexivity)).
-  by move/prov_extract.
+  apply prov_extract.
 Qed.
 
 Lemma pars_pi_inv n p (A : Tm n) B C :
@@ -1771,10 +1785,18 @@ Lemma pars_pi_inv n p (A : Tm n) B C :
   exists A0 B0, extract C = TBind p A0 B0 /\
              rtc Par.R A A0 /\ rtc Par.R B B0.
 Proof.
-  have : prov (TBind p A B) (TBind p A B) by sfirstorder.
+  have : prov (TBind p A B) (TBind p A B) by hauto lq:on ctrs:prov, rtc.
   move : prov_pars. repeat move/[apply].
-  move /(_ eq_refl).
-  by move /prov_extract.
+  apply prov_extract.
+Qed.
+
+Lemma pars_var_inv n (i : fin n) C :
+  rtc Par.R (VarTm i) C ->
+  extract C = VarTm i.
+Proof.
+  have : prov (VarTm i) (VarTm i) by hauto lq:on ctrs:prov, rtc.
+  move : prov_pars. repeat move/[apply].
+  apply prov_extract.
 Qed.
 
 Lemma pars_univ_inj n i j (C : Tm n) :
