@@ -1058,6 +1058,104 @@ Definition prov_univ {n} i0 (a : Tm n) :=
   | _ => False
   end.
 
+
+Inductive prov {n} : Tm n -> Tm n -> Prop :=
+| P_Bind p A A0 B B0  :
+  rtc Par.R A A0 ->
+  rtc Par.R B B0 ->
+  prov (TBind p A B) (TBind p A0 B0)
+| P_Abs h a :
+  (forall b, prov h (subst_Tm (scons b VarTm) a)) ->
+  prov h (Abs a)
+| P_App h a b  :
+  prov h a ->
+  prov h (App a b)
+| P_Pair h a b :
+  prov h a ->
+  prov h b ->
+  prov h (Pair a b)
+| P_Proj h p a :
+  prov h a ->
+  prov h (Proj p a)
+| P_Bot  :
+  prov Bot Bot
+| P_Var i :
+  prov (VarTm i) (VarTm i)
+| P_Univ i :
+  prov (Univ i) (Univ i).
+
+Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
+Proof.
+  move => h. elim : n a b /h; qauto ctrs:Par.R.
+Qed.
+
+Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
+Proof.
+  move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
+Qed.
+
+Lemma prov_rpar n (u : Tm n) a b : prov u a -> RPar.R a b -> prov u b.
+Proof.
+  move => h.
+  move : b.
+  elim : u a / h.
+  - qauto l:on ctrs:prov inv:RPar.R use:@rtc_r, RPar_Par.
+  - hauto lq:on ctrs:prov inv:RPar.R use:RPar.substing.
+  - move => h a b ha iha b0.
+    elim /RPar.inv => //= _.
+    + move => a0 a1 b1 b2 h0 h1 [*]. subst.
+      have {}iha :  prov h (Abs a1) by hauto lq:on ctrs:RPar.R.
+      hauto lq:on inv:prov use:RPar.substing.
+    + move => a0 a1 b1 b2 c0 c1.
+      move => h0 h1 h2 [*]. subst.
+      have {}iha : prov h (Pair a1 b2) by hauto lq:on ctrs:RPar.R.
+      hauto lq:on inv:prov ctrs:prov.
+    + hauto lq:on ctrs:prov.
+  - hauto lq:on ctrs:prov inv:RPar.R.
+  - move => h p a ha iha b.
+    elim /RPar.inv => //= _.
+    + move => p0 a0 a1 h0 [*]. subst.
+      have {iha} :  prov h (Abs a1) by hauto lq:on ctrs:RPar.R.
+      hauto lq:on ctrs:prov inv:prov use:RPar.substing.
+    + move => p0 a0 a1 b0 b1 h0 h1 [*]. subst.
+      have {iha} : prov h (Pair a1 b1) by hauto lq:on ctrs:RPar.R.
+      qauto l:on inv:prov.
+    + hauto lq:on ctrs:prov.
+  - hauto lq:on ctrs:prov inv:RPar.R.
+  - hauto l:on ctrs:RPar.R inv:RPar.R.
+  - hauto l:on ctrs:RPar.R inv:RPar.R.
+Qed.
+
+Lemma prov_epar n (u : Tm n) a b : prov u a -> EPar.R a b -> prov u b.
+Proof.
+  move => + h. move : u.
+  elim : n a b /h => n.
+  - move => a0 a1 ha iha u ha0.
+    constructor.
+    move => b. asimpl.
+    hauto lq:on ctrs:prov.
+  - move => a0 a1 ha iha u hu.
+    constructor.
+
+
+Lemma prov_par_pi n p h (A : Tm n) B C : prov h (TBind p A B) -> Par.R (TBind p A B) C -> prov h C.
+Proof.
+  move E : (TBind p A B) => T + h0.
+  move : p h A B E.
+  elim : n T C /h0 => //=.
+  - move => n a0 a1 ha iha p h A B ?. subst.
+    specialize iha with (1 := eq_refl).
+    move => {}/iha.
+    move => h0.
+    constructor.
+    move => ?. asimpl. by constructor.
+  -
+
+Lemma prov_par n (u : Tm n) a b : prov u a -> hfb u -> Par.R a b -> prov u b.
+Proof.
+  move => + + h. move : u.
+  elim : n a b /h => //=.
+
 (* Can consider combine prov and provU *)
 Fixpoint prov {n} (h : Tm n) (a : Tm n) : Prop :=
   match a with
@@ -1213,16 +1311,6 @@ Proof.
   - hauto lq:on rew:off inv:Tm rew:db:prov.
   - hauto inv:Tm l:on rew:db:prov.
   - hauto l:on inv:Tm rew:db:prov.
-Qed.
-
-Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
-Proof.
-  move => h. elim : n a b /h; qauto ctrs:Par.R.
-Qed.
-
-Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
-Proof.
-  move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
 Qed.
 
 Definition union {A : Type} (R0 R1 : A -> A -> Prop) a b :=
