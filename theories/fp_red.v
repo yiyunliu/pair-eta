@@ -1061,30 +1061,29 @@ Definition prov_univ {n} i0 (a : Tm n) :=
   | _ => False
   end.
 
-(* Can consider combine prov and provU *)
-#[tactic="prov_tac"]Equations prov {n} (h : Tm n) (a : Tm n) : Prop by wf (depth_tm a) lt :=
-  prov h (TBind p0 A0 B0) := prov_bind p0 A0 B0 h;
- (* TODOS *)
- (* Try forall b, prov h (a {b /x})? *)
- (* Replace the parallel red from I_Red with Strong normalization *)
- (* Prove the uniqueness of eta normal form for terms in beta normal form *)
-  prov h (Abs a) := prov (ren_Tm shift h) a;
-  prov h (App a b) := prov h a;
-  prov h (Pair a b) := prov h a /\ prov h b;
-  prov h (Proj p a) := prov h a;
-  prov h Bot := h = Bot;
-  prov h (VarTm i) := h = VarTm i;
-  prov h (Univ i) := prov_univ i h .
+Fixpoint prov {n} (h : Tm n) (a : Tm n) : Prop :=
+  match a with
+  | (TBind p0 A0 B0) => prov_bind p0 A0 B0 h
+  | (Abs a) => prov (ren_Tm shift h) a
+  | (App a b) => prov h a
+  | (Pair a b) => prov h a /\ prov h b
+  | (Proj p a) => prov h a
+  | Bot => h = Bot
+  | VarTm i => h = VarTm  i
+  | Univ i => prov_univ i h
+  end.
 
-#[tactic="prov_tac"]Equations extract {n} (a : Tm n) : Tm n by wf (depth_tm a) lt :=
-  extract (TBind p A B) := TBind p A B;
-  extract (Abs a) := subst_Tm (scons Bot VarTm) (extract a);
-  extract (App a b) := extract a;
-  extract (Pair a b) := extract a;
-  extract (Proj p a) := extract a;
-  extract Bot := Bot;
-  extract (VarTm i) := (VarTm i);
-  extract (Univ i) := Univ i.
+Fixpoint extract {n} (a : Tm n) : Tm n :=
+  match a with
+  | TBind p A B => TBind p A B
+  | Abs a => subst_Tm (scons Bot VarTm) (extract a)
+  | App a b => extract a
+  | Pair a b => extract a
+  | Proj p a => extract a
+  | Bot => Bot
+  | VarTm i => VarTm i
+  | Univ i => Univ i
+  end.
 
 Lemma ren_extract n m (a : Tm n) (ξ : fin n -> fin m) :
   extract (ren_Tm ξ a) = ren_Tm ξ (extract a).
@@ -1095,10 +1094,10 @@ Proof.
     simp extract.
     rewrite ih.
     by asimpl.
-  - hauto q:on rew:db:extract.
-  - hauto q:on rew:db:extract.
-  - hauto q:on rew:db:extract.
-  - hauto q:on rew:db:extract.
+  - hauto q:on .
+  - hauto q:on .
+  - hauto q:on .
+  - hauto q:on .
   - sfirstorder.
   - sfirstorder.
 Qed.
@@ -1115,7 +1114,7 @@ Lemma prov_ren n m (ξ : fin n -> fin m) h a :
   prov h a -> prov (ren_Tm ξ h) (ren_Tm ξ a).
 Proof.
   move : m ξ h. elim : n / a.
-  - hauto q:on rew:db:prov.
+  - hauto q:on.
   - move => n a ih m ξ h.
     simp prov.
     move /ih => {ih}.
@@ -1125,16 +1124,28 @@ Proof.
     suff  : ren_Tm (upRen_Tm_Tm ξ) (ren_Tm shift h) = ren_Tm shift (ren_Tm ξ h) by move => <-.
     clear.
     case : h => * /=; by asimpl.
-  - hauto q:on rew:db:prov.
-  - qauto l:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto l:on use:prov_bind_ren rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto l:on inv:Tm rew:db:prov.
+  - hauto q:on.
+  - qauto l:on.
+  - hauto lq:on.
+  - hauto l:on use:prov_bind_ren.
+  - hauto lq:on.
+  - hauto l:on inv:Tm.
 Qed.
 
+Fixpoint erase {n} (a : Tm n) : Tm n :=
+  match a with
+  | TBind p0 A0 B0 => TBind p0 A0 B0
+  | Abs a => Abs (erase a)
+  | App a b => erase a
+  | Pair a b => Pair (erase a) (erase b)
+  | Proj p a => Proj p (erase a)
+  | Bot => Bot
+  | VarTm i => VarTm  i
+  | Univ i => Univ i
+  end.
+
 Lemma prov_antiren n m (ξ : fin n -> fin m) h a:
-  prov (ren_Tm ξ h) a -> exists a', ren_Tm ξ a' = a /\ prov h a'.
+  prov (ren_Tm ξ h) a -> exists a', ren_Tm ξ a' = erase a /\ prov h a'.
 Proof.
   move E : (ren_Tm ξ h) => H.
   move : ξ H E.
@@ -1144,23 +1155,29 @@ Proof.
     move => j [?]. subst.
     exists (VarTm j). firstorder.
   - move => a iha ξ ? ?. subst.
-    simp prov.
+    simp prov => /=.
     asimpl.
     move => {}/iha iha.
     specialize iha with (1 := eq_refl).
-    move : iha => [a' [h1 h2]]. subst.
+    move : iha => [a' [h1 h2]].
+    rewrite -h1.
     exists (Abs (ren_Tm shift a')).
-    split. by asimpl.
-    simp prov. hauto lq:on use:prov_ren.
+    simpl.
+    split. f_equal.
+    by asimpl.
+    hauto l:on use:prov_ren.
   - move => a iha b ihb ξ ? ?. subst.
     simp prov.
-    move /iha. move/(_ ξ eq_refl) => [a' [? ?]] {iha ihb}. subst.
-    (* Doesn't hold *)
-    have : exists b', ren_Tm ξ b' = b by admit.
-    move => [b' ?]. subst.
-    exists (App a' b').
-    split => //=.
-    simp prov.
+    move /iha. move/(_ ξ eq_refl) => [a' [h0 h1]] {iha ihb}.
+    simpl. rewrite -{}h0.
+    sfirstorder.
+  - move => a ha b hb ξ ? ?. subst => /=.
+    move => [{}/ha h0 {}/hb h1].
+    specialize h0 with (1 := eq_refl).
+    specialize h1 with (1 := eq_refl).
+    move : h0 => [a' [h0 ?]].
+    move : h1 => [b' [h1 ?]].
+    exists (Pair a' b'). sfirstorder.
 Admitted.
 
 (* Lemma ren_hfb {n m} (ξ : fin n -> fin m) u  : hfb (ren_Tm ξ u) = hfb u. *)
@@ -1168,32 +1185,59 @@ Admitted.
 
 (* Hint Rewrite @ren_hfb : prov. *)
 
+Lemma erase_ren n m (u : Tm n) (ξ : fin n -> fin m) :
+  erase (ren_Tm ξ u) = ren_Tm ξ (erase u).
+Proof.
+  move : m ξ.
+  elim : n /u => //=; scongruence.
+Qed.
+
+Lemma erase_subst n m (u : Tm n) (ρ : fin n -> Tm m) :
+  erase (subst_Tm ρ u) = subst_Tm (funcomp erase ρ) (erase u).
+Proof.
+  move : m ρ.
+  elim : n /u => //= n.
+  - move => a iha m ρ. f_equal.
+    rewrite iha.
+    asimpl => /=.
+    apply ext_Tm.
+    move => x.
+    destruct x as [x|] => //=.
+    rewrite /funcomp.
+    by rewrite erase_ren.
+  - scongruence.
+  - scongruence.
+  - move => p A ihA B ihB m ρ.
+    f_equal.
+    rewrite
+Admitted.
+
 Lemma prov_par n (u : Tm n) a b : prov u a -> Par.R a b -> prov u b.
 Proof.
   move => + h. move : u.
-  elim : n a b /h.
+  elim : n a b /h => //=.
   - move => n a0 a1 b0 b1 ha iha hb ihb u /=.
     simp prov => h.
-    have [a1' [? ?]] : exists a1', ren_Tm shift a1' = a1 /\ prov u a1'
+    have [a1' [h0 h1]] : exists a1', ren_Tm shift a1' = erase a1 /\ prov u a1'
         by eauto using prov_antiren.
-    subst; by asimpl.
-  - hauto lq:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
-  - hauto l:on use:prov_ren rew:db:prov.
-  - hauto l:on rew:db:prov.
-  - simp prov.
-  - hauto lq:on rew:db:prov.
-  - hauto l:on rew:db:prov.
-  - hauto l:on rew:db:prov.
-  - hauto lq:on rew:db:prov.
+    have {h0} : subst_Tm (scons (erase b1) VarTm) (ren_Tm shift a1') = subst_Tm (scons (erase b1) VarTm) (erase a1) by congruence.
+    asimpl => ?. subst.
+    move : h1.
+    have ->  : subst_Tm (scons (erase b1) VarTm) (erase a1) = subst_Tm (funcomp erase (scons b1 VarTm)) (erase a1) by admit.
+    rewrite -erase_subst.
+
+  - hauto lq:on.
+  - hauto lq:on.
+  - hauto lq:on.
+  - hauto l:on use:prov_ren.
+  - hauto l:on.
+  - hauto lq:on.
+  - hauto l:on.
   - move => n p A0 A1 B0 B1 hA ihA hB ihB u. simp prov.
     case : u => //=.
     move => p0 A B [? [h2 h3]]. subst.
     repeat split => //=;
-    hauto l:on use:rtc_r rew:db:prov.
-  - sfirstorder.
-  - sfirstorder.
+    hauto l:on use:rtc_r.
 Qed.
 
 Lemma prov_pars n (u : Tm n) a b : prov u a -> rtc Par.R a b -> prov u b.
@@ -1213,9 +1257,9 @@ Lemma prov_extract n u (a : Tm n) :
   prov u a -> prov_extract_spec u a.
 Proof.
   move : u. elim : n / a => //=.
-  - hauto l:on inv:Tm rew:db:prov, extract.
+  - hauto l:on inv:Tm, extract.
   - move => n a ih [] //=.
-    + hauto q:on rew:db:extract, prov.
+    + hauto q:on , prov.
     + move => p A B /=.
       simp prov. move /ih {ih}.
       simpl.
@@ -1230,15 +1274,15 @@ Proof.
       have {}h0 : subst_Tm (scons Bot VarTm) (extract a) =
                     subst_Tm (scons Bot VarTm) (ren_Tm shift (TBind p A1 B1)) by sauto lq:on.
       move : h0. asimpl.
-      hauto lq:on rew:db:extract.
-    + hauto q:on rew:db:extract, prov.
-  - hauto lq:on rew:off inv:Tm rew:db:prov, extract.
+      hauto lq:on .
+    + hauto q:on .
+  - hauto lq:on rew:off inv:Tm, extract.
   - move => + + + + + []//=;
-      hauto lq:on rew:off rew:db:prov, extract.
-  - hauto inv:Tm l:on rew:db:prov, extract.
-  - hauto l:on inv:Tm rew:db:prov, extract.
-  - hauto l:on inv:Tm rew:db:prov, extract.
-  - hauto l:on inv:Tm rew:db:prov, extract.
+      hauto lq:on rew:off, extract.
+  - hauto inv:Tm l:on, extract.
+  - hauto l:on inv:Tm, extract.
+  - hauto l:on inv:Tm, extract.
+  - hauto l:on inv:Tm, extract.
 Qed.
 
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
