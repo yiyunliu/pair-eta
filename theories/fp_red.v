@@ -387,21 +387,27 @@ Module ERed.
   | AbsCong a0 a1 :
     R a0 a1 ->
     R (Abs a0) (Abs a1)
-  | AppCong a0 a1 b0 b1 :
+  | AppCong0 a0 a1 b :
     R a0 a1 ->
+    R (App a0 b) (App a1 b)
+  | AppCong1 a b0 b1 :
     R b0 b1 ->
-    R (App a0 b0) (App a1 b1)
-  | PairCong a0 a1 b0 b1 :
+    R (App a b0) (App a b1)
+  | PairCong0 a0 a1 b :
     R a0 a1 ->
+    R (Pair a0 b) (Pair a1 b)
+  | PairCong1 a b0 b1 :
     R b0 b1 ->
-    R (Pair a0 b0) (Pair a1 b1)
+    R (Pair a b0) (Pair a b1)
   | ProjCong p a0 a1 :
     R a0 a1 ->
     R (Proj p a0) (Proj p a1)
-  | BindCong p A0 A1 B0 B1:
+  | BindCong0 p A0 A1 B:
     R A0 A1 ->
+    R (TBind p A0 B) (TBind p A1 B)
+  | BindCong1 p A B0 B1:
     R B0 B1 ->
-    R (TBind p A0 B0) (TBind p A1 B1).
+    R (TBind p A B0) (TBind p A B1).
 
   Lemma AppEta' n a (u : Tm n) :
     u = (Abs (App (ren_Tm shift a) (VarTm var_zero))) ->
@@ -430,6 +436,44 @@ Module ERed.
   Qed.
 
 End ERed.
+
+Module EReds.
+
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:ERed.R.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc ERed.R a b ->
+    rtc ERed.R (Abs a) (Abs b).
+  Proof. solve_s. Qed.
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc ERed.R a0 a1 ->
+    rtc ERed.R b0 b1 ->
+    rtc ERed.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1 :
+    rtc ERed.R a0 a1 ->
+    rtc ERed.R b0 b1 ->
+    rtc ERed.R (TBind p a0 b0) (TBind p a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc ERed.R a0 a1 ->
+    rtc ERed.R b0 b1 ->
+    rtc ERed.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma ProjCong n p (a0 a1  : Tm n) :
+    rtc ERed.R a0 a1 ->
+    rtc ERed.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+End EReds.
 
 Module EPar.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
@@ -1145,6 +1189,21 @@ Proof.
   induction 1; hauto lq:on ctrs:EPar.R use:EPar.refl.
 Qed.
 
+Lemma EPar_ERed n (a b : Tm n) : EPar.R a b -> rtc ERed.R a b.
+Proof.
+  move => h. elim : n a b /h.
+  - eauto using rtc_r, ERed.AppEta.
+  - eauto using rtc_r, ERed.PairEta.
+  - auto using rtc_refl.
+  - eauto using EReds.AbsCong.
+  - eauto using EReds.AppCong.
+  - eauto using EReds.PairCong.
+  - eauto using EReds.ProjCong.
+  - eauto using EReds.BindCong.
+  - auto using rtc_refl.
+  - auto using rtc_refl.
+Qed.
+
 Lemma EPar_Par n (a b : Tm n) : EPar.R a b -> Par.R a b.
 Proof.
   move => h. elim : n a b /h; qauto ctrs:Par.R.
@@ -1153,6 +1212,11 @@ Qed.
 Lemma RPar_Par n (a b : Tm n) : RPar.R a b -> Par.R a b.
 Proof.
   move => h. elim : n a b /h; hauto lq:on ctrs:Par.R.
+Qed.
+
+Lemma rtc_idem n (a b : Tm n) : rtc (rtc EPar.R) a b -> rtc EPar.R a b.
+Proof.
+  induction 1; hauto l:on use:@relations.rtc_transitive, @rtc_r.
 Qed.
 
 Lemma prov_rpar n (u : Tm n) a b : prov u a -> RPar.R a b -> prov u b.
@@ -1228,8 +1292,8 @@ Proof.
     + move => a0 *. subst.
       rewrite -prov_pair.
       by constructor.
-    + move => p0 A1 A2 B1 B2 h0 h1 [*]. subst.
-      qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
+    + qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
+    + qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
   - move => h a ha iha b.
     elim /inv => // _.
     + move => a0 *. subst.
@@ -1238,8 +1302,7 @@ Proof.
     + move => a0 *. subst.
       rewrite -prov_pair.
       by constructor.
-    + move => a0 a1 h0 [*]. subst.
-      constructor. eauto using ERed.substing.
+    + hauto lq:on ctrs:prov use:ERed.substing.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
   - move => h a b ha iha hb ihb b0.
     elim /inv => //_.
@@ -1249,6 +1312,7 @@ Proof.
     + move => a0 *. subst.
       rewrite -prov_pair.
       by constructor.
+    + hauto lq:on ctrs:prov.
     + hauto lq:on ctrs:prov.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
@@ -1505,11 +1569,6 @@ End ERPars.
 Lemma ERPar_Par n (a b : Tm n) : ERPar.R a b -> Par.R a b.
 Proof.
   sfirstorder use:EPar_Par, RPar_Par.
-Qed.
-
-Lemma rtc_idem n (a b : Tm n) : rtc (rtc EPar.R) a b -> rtc EPar.R a b.
-Proof.
-  induction 1; hauto l:on use:@relations.rtc_transitive, @rtc_r.
 Qed.
 
 Lemma Par_ERPar n (a b : Tm n) : Par.R a b -> rtc ERPar.R a b.
