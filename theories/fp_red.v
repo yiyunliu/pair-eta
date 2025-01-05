@@ -1672,3 +1672,50 @@ Lemma join_substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
   join a b ->
   join (subst_Tm ρ a) (subst_Tm ρ b).
 Proof. hauto lq:on unfold:join use:Pars.substing. Qed.
+
+
+Fixpoint erase {n} (a : Tm n) : Tm n :=
+  match a with
+  | TBind p0 A0 B0 => TBind p0 (erase A0) (erase B0)
+  | Abs a => Abs (erase a)
+  | App a b => erase a
+  | Pair a b => Pair (erase a) (erase b)
+  | Proj p a => (erase a)
+  | Bot => Bot
+  | VarTm i => VarTm  i
+  | Univ i => Univ i
+  end.
+
+Lemma erase_ren n m (u : Tm n) (ξ : fin n -> fin m) :
+  erase (ren_Tm ξ u) = ren_Tm ξ (erase u).
+Proof.
+  move : m ξ.
+  elim : n /u => //=; scongruence.
+Qed.
+
+Lemma erase_subst n m (u : Tm n) (ρ : fin n -> Tm m) :
+  erase (subst_Tm ρ u) = subst_Tm (funcomp erase ρ) (erase u).
+Proof.
+  move : m ρ.
+  elim : n /u => //= n.
+  - move => a iha m ρ. f_equal.
+    rewrite iha.
+    asimpl => /=.
+    apply ext_Tm.
+    move => x.
+    destruct x as [x|] => //=.
+    rewrite /funcomp.
+    by rewrite erase_ren.
+  - scongruence.
+  - move => p A ihA B ihB m ρ.
+    f_equal.
+    scongruence.
+    rewrite ihB.
+    apply ext_Tm => x.
+    destruct x as [x|] => //=.
+    rewrite /funcomp. simpl.
+    by rewrite erase_ren.
+Qed.
+
+Lemma erase_subst' n m (u : Tm n) (ρ : fin n -> Tm m) :
+  (forall i, ρ i = )
