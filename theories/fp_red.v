@@ -373,6 +373,73 @@ Module RPar.
     move => h0 h1. apply morphing => //=.
     qauto l:on ctrs:R inv:option.
   Qed.
+
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ξ : fin n -> fin m) :
+    R (ren_Tm ξ a) b -> exists b0, R a b0 /\ ren_Tm ξ b0 = b.
+  Proof.
+    move E : (ren_Tm ξ a) => u h.
+    move : n ξ a E. elim : m u b/h.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//=.
+      move => c c0 [+ ?]. subst.
+      case : c => //=.
+      move => c [?]. subst.
+      spec_refl.
+      move : iha => [c1][ih0]?. subst.
+      move : ihb => [c2][ih1]?. subst.
+      eexists. split.
+      apply AppAbs; eauto.
+      by asimpl.
+    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//=.
+      move => []//= t t0 t1 [*]. subst.
+      spec_refl.
+      move : iha => [? [*]].
+      move : ihb => [? [*]].
+      move : ihc => [? [*]].
+      eexists. split.
+      apply AppPair; hauto. subst.
+      by asimpl.
+    - move => n p a0 a1 ha iha m ξ []//= p0 []//= t [*]. subst.
+      spec_refl. move : iha => [b0 [? ?]]. subst.
+      eexists. split. apply ProjAbs; eauto. by asimpl.
+    - move => n p a0 a1 b0 b1 ha iha hb ihb m ξ []//= p0 []//= t t0[*].
+      subst. spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by eauto using ProjPair.
+      hauto q:on.
+    - move => n i m ξ []//=.
+      hauto l:on.
+    - move => n a0 a1 ha iha m ξ []//= t [*]. subst.
+      spec_refl.
+      move  :iha => [b0 [? ?]]. subst.
+      eexists. split. by apply AbsCong; eauto.
+      by asimpl.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0 [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply AppCong; eauto.
+      done.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0[*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply PairCong; eauto.
+      by asimpl.
+    - move => n p a0 a1 ha iha m ξ []//= p0 t [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      eexists. split. by apply ProjCong; eauto.
+      by asimpl.
+    - move => n p A0 A1 B0 B1 ha iha hB ihB m ξ []//= ? t t0 [*]. subst.
+      spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihB => [c0 [? ?]]. subst.
+      eexists. split. by apply BindCong; eauto.
+      by asimpl.
+    - move => n n0 ξ []//=. hauto l:on.
+    - move => n i n0 ξ []//=. hauto l:on.
+  Qed.
 End RPar.
 
 Module ERed.
@@ -1863,8 +1930,70 @@ Proof.
   hauto l:on.
 Qed.
 
-
 Lemma join_substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
   join a b ->
   join (subst_Tm ρ a) (subst_Tm ρ b).
 Proof. hauto lq:on unfold:join use:Pars.substing. Qed.
+
+
+Fixpoint ne {n} (a : Tm n) :=
+  match a with
+  | VarTm i => true
+  | TBind _ A B => nf A && nf B
+  | Bot => false
+  | App a b => ne a && nf b
+  | Abs a => false
+  | Univ _ => false
+  | Proj _ a => ne a
+  | Pair _ _ => false
+  end
+with nf {n} (a : Tm n) :=
+  match a with
+  | VarTm i => true
+  | TBind _ A B => nf A && nf B
+  | Bot => true
+  | App a b => ne a && nf b
+  | Abs a => nf a
+  | Univ _ => true
+  | Proj _ a => ne a
+  | Pair a b => nf a && nf b
+end.
+
+Lemma ne_nf n a : @ne n a -> nf a.
+Proof. elim : a => //=. Qed.
+
+Definition wn {n} (a : Tm n) := exists b, rtc RPar.R a b /\ nf b.
+Definition wne {n} (a : Tm n) := exists b, rtc RPar.R a b /\ ne b.
+
+(* Weakly neutral implies weakly normal *)
+Lemma wne_wn n a : @wne n a -> wn a.
+Proof. sfirstorder use:ne_nf. Qed.
+
+(* Normal implies weakly normal *)
+Lemma nf_wn n v : @nf n v -> wn v.
+Proof. sfirstorder ctrs:rtc. Qed.
+
+Lemma nf_refl n (a b : Tm n) (h : RPar.R a b) : (nf a -> b = a) /\ (ne a -> b = a).
+Proof.
+  elim : a b /h => //=; solve [hauto b:on].
+Qed.
+
+Lemma ne_nf_ren n m (a : Tm n) (ξ : fin n -> fin m) :
+  (ne a <-> ne (ren_Tm ξ a)) /\ (nf a <-> nf (ren_Tm ξ a)).
+Proof.
+  move : m ξ. elim : n / a => //=; solve [hauto b:on].
+Qed.
+
+Lemma wne_app n (a b : Tm n) :
+  wne a -> wn b -> wne (App a b).
+Proof.
+  move => [a0 [? ?]] [b0 [? ?]].
+  exists (App a0 b0). hauto b:on use:RPars.AppCong.
+Qed.
+
+Lemma wn_abs (a : tm) (h : wn a) : wn (tAbs a).
+Proof.
+  move : h => [v [? ?]].
+  exists (tAbs v).
+  eauto using S_Abs.
+Qed.
