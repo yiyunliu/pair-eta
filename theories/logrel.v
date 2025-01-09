@@ -638,7 +638,7 @@ Proof.
   rewrite /ρ_ok in hρ.
   move => h.
   rewrite /funcomp.
-  apply hρ with (m := m').
+  apply hρ with (k := m').
   move : h. rewrite -hξ.
   by asimpl.
 Qed.
@@ -661,6 +661,17 @@ Lemma weakening_Sem n Γ (a : Tm n) A B i
 Proof.
   apply : renaming_SemWt; eauto.
   hauto lq:on inv:option unfold:renaming_ok.
+Qed.
+
+Lemma SemWt_Wn n Γ (a : Tm n) A :
+  Γ ⊨ a ∈ A ->
+  wn a /\ wn A.
+Proof.
+  move => h.
+  have {}/h := ρ_ok_bot _ Γ => h.
+  have h0 : wn (subst_Tm (fun _ : fin n => (Bot : Tm 0)) A) by hauto l:on use:adequacy.
+  have h1 : wn (subst_Tm (fun _ : fin n => (Bot : Tm 0)) a)by hauto l:on use:adequacy_wn.
+  move {h}. hauto lq:on use:wn_antirenaming.
 Qed.
 
 Lemma SemWt_Univ n Γ (A : Tm n) i  :
@@ -787,7 +798,7 @@ Proof.
   simpl in hPPi.
   move /InterpUniv_Bind_inv_nopf : hPPi.
   move => [PA [hPA [hTot ?]]]. subst=>/=.
-  rewrite /SumSpace.
+  rewrite /SumSpace. right.
   exists (subst_Tm ρ a), (subst_Tm ρ b).
   split.
   - hauto l:on use:Pars.substing.
@@ -809,9 +820,10 @@ Proof.
   move : h0 => [S][h2][h3]?. subst.
   move : h1 => /=.
   rewrite /SumSpace.
+  case; first by hauto lq:on use:adequacy_wne, wne_proj.
   move => [a0 [b0 [h4 [h5 h6]]]].
   exists m, S. split => //=.
-  have {}h4 : rtc RPar'.R (Proj PL (subst_Tm ρ a)) (Proj PL (Pair a0 b0)) by eauto using RPar's.ProjCong.
+  have {}h4 : rtc RPar'.R (Proj PL (subst_Tm ρ a)) (Proj PL (Pair a0 b0)) by eauto using RPars'.ProjCong.
   have ? : RPar'.R (Proj PL (Pair a0 b0)) a0 by hauto l:on use:RPar'.refl, RPar'.ProjPair'.
   have : rtc RPar'.R (Proj PL (subst_Tm ρ a)) a0 by eauto using @relations.rtc_r.
   move => h.
@@ -837,17 +849,23 @@ Proof.
   move : h0 => [S][h2][h3]?. subst.
   move : h1 => /=.
   rewrite /SumSpace.
-  move => [a0 [b0 [h4 [h5 h6]]]].
-  specialize h3 with (1 := h5).
-  move : h3 => [PB hPB].
-  have hr : forall p, rtc RPar'.R (Proj p (subst_Tm ρ a)) (Proj p (Pair a0 b0)) by eauto using RPar's.ProjCong.
-  have hrl : RPar'.R (Proj PL (Pair a0 b0)) a0 by hauto l:on use:RPar'.ProjPair', RPar'.refl.
-  have hrr : RPar'.R (Proj PR (Pair a0 b0)) b0 by hauto l:on use:RPar'.ProjPair', RPar'.refl.
-  exists m, PB.
-  asimpl. split.
-  - have h : rtc RPar'.R (Proj PL (subst_Tm ρ a)) a0 by eauto using @relations.rtc_r.
-    have {}h : rtc RPar'.R (subst_Tm (scons (Proj PL (subst_Tm ρ a)) ρ) B) (subst_Tm (scons a0 ρ) B) by eauto using substing_RPar's.
-    move : hPB. asimpl.
-    eauto using InterpUnivN_back_preservation_star.
-  - hauto lq:on use:@relations.rtc_r, InterpUniv_back_clos_star.
+  case.
+  - move => h.
+    have hp : forall p, wne (Proj p (subst_Tm ρ a)) by auto using wne_proj.
+    have hp0 := hp PL. have hp1 := hp PR => {hp}.
+    have : S (Proj PL (subst_Tm ρ a)) by hauto q:on use:adequacy_wne.
+    move /h3 => [PB]. asimpl. hauto lq:on use:adequacy_wne.
+  - move => [a0 [b0 [h4 [h5 h6]]]].
+    specialize h3 with (1 := h5).
+    move : h3 => [PB hPB].
+    have hr : forall p, rtc RPar'.R (Proj p (subst_Tm ρ a)) (Proj p (Pair a0 b0)) by eauto using RPars'.ProjCong.
+    have hrl : RPar'.R (Proj PL (Pair a0 b0)) a0 by hauto l:on use:RPar'.ProjPair', RPar'.refl.
+    have hrr : RPar'.R (Proj PR (Pair a0 b0)) b0 by hauto l:on use:RPar'.ProjPair', RPar'.refl.
+    exists m, PB.
+    asimpl. split.
+    + have h : rtc RPar'.R (Proj PL (subst_Tm ρ a)) a0 by eauto using @relations.rtc_r.
+      have {}h : rtc RPar'.R (subst_Tm (scons (Proj PL (subst_Tm ρ a)) ρ) B) (subst_Tm (scons a0 ρ) B) by eauto using substing_RPar's.
+      move : hPB. asimpl.
+      eauto using InterpUnivN_back_preservation_star.
+    + hauto lq:on use:@relations.rtc_r, InterpUniv_back_clos_star.
 Qed.
