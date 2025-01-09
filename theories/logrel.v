@@ -603,8 +603,8 @@ Lemma ρ_ok_bot n (Γ : fin n -> Tm n)  :
   ρ_ok Γ (fun _ => Bot).
 Proof.
   rewrite /ρ_ok.
-  move => i k PA.
-inversion i; subst. Qed.
+  hauto q:on use:adequacy.
+Qed.
 
 Lemma ρ_ok_cons n i (Γ : fin n -> Tm n) ρ a PA A :
   ⟦ subst_Tm ρ A ⟧ i ↘ PA -> PA a ->
