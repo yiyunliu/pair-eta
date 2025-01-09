@@ -245,6 +245,13 @@ Module Pars.
   Qed.
 End Pars.
 
+Definition var_or_bot {n} (a : Tm n) :=
+  match a with
+  | VarTm _ => true
+  | Bot => true
+  | _ => false
+  end.
+
 (***************** Beta rules only ***********************)
 Module RPar.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
@@ -374,23 +381,56 @@ Module RPar.
     qauto l:on ctrs:R inv:option.
   Qed.
 
-  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ξ : fin n -> fin m) :
-    R (ren_Tm ξ a) b -> exists b0, R a b0 /\ ren_Tm ξ b0 = b.
+  Lemma var_or_bot_imp {n} (a b : Tm n) :
+    var_or_bot a ->
+    a = b -> ~~ var_or_bot b -> False.
   Proof.
-    move E : (ren_Tm ξ a) => u h.
-    move : n ξ a E. elim : m u b/h.
-    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//=.
+    hauto lq:on inv:Tm.
+  Qed.
+
+  Lemma var_or_bot_up n m (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    (forall i, var_or_bot (up_Tm_Tm ρ i)).
+  Proof.
+    move => h /= [i|].
+    - asimpl.
+      move /(_ i) in h.
+      rewrite /funcomp.
+      move : (ρ i) h.
+      case => //=.
+    - sfirstorder.
+  Qed.
+
+  Local Ltac antiimp := qauto l:on use:var_or_bot_imp.
+
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    R (subst_Tm ρ a) b -> exists b0, R a b0 /\ subst_Tm ρ b0 = b.
+  Proof.
+    move E : (subst_Tm ρ a) => u hρ h.
+    move : n ρ hρ a E. elim : m u b/h.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
       move => c c0 [+ ?]. subst.
-      case : c => //=.
+      case : c => //=; first by antiimp.
       move => c [?]. subst.
+      spec_refl.
+      have /var_or_bot_up hρ' := hρ.
+      move : iha hρ' => /[apply] iha.
+      move : ihb hρ => /[apply] ihb.
       spec_refl.
       move : iha => [c1][ih0]?. subst.
       move : ihb => [c2][ih1]?. subst.
       eexists. split.
       apply AppAbs; eauto.
       by asimpl.
-    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//=.
-      move => []//= t t0 t1 [*]. subst.
+    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ hρ []//=;
+               first by antiimp.
+      move => []//=; first by antiimp.
+      move => t t0 t1 [*]. subst.
+      have  {}/iha := hρ => iha.
+      have  {}/ihb := hρ => ihb.
+      have  {}/ihc := hρ => ihc.
       spec_refl.
       move : iha => [? [*]].
       move : ihb => [? [*]].
@@ -398,49 +438,299 @@ Module RPar.
       eexists. split.
       apply AppPair; hauto. subst.
       by asimpl.
-    - move => n p a0 a1 ha iha m ξ []//= p0 []//= t [*]. subst.
+    - move => n p a0 a1 ha iha m ρ hρ []//=;
+               first by antiimp.
+      move => p0 []//= t [*]; first by antiimp. subst.
+      have  /var_or_bot_up {}/iha  := hρ => iha.
       spec_refl. move : iha => [b0 [? ?]]. subst.
       eexists. split. apply ProjAbs; eauto. by asimpl.
-    - move => n p a0 a1 b0 b1 ha iha hb ihb m ξ []//= p0 []//= t t0[*].
-      subst. spec_refl.
+    - move => n p a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => p0 []//=; first by antiimp. move => t t0[*].
+      subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
+      spec_refl.
       move : iha => [b0 [? ?]].
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
-    - move => n i m ξ []//=.
+    - move => n i m ρ hρ []//=.
       hauto l:on.
-    - move => n a0 a1 ha iha m ξ []//= t [*]. subst.
+    - move => n a0 a1 ha iha m ρ hρ []//=; first by antiimp.
+      move => t [*]. subst.
+      have /var_or_bot_up {}/iha := hρ => iha.
       spec_refl.
       move  :iha => [b0 [? ?]]. subst.
       eexists. split. by apply AbsCong; eauto.
       by asimpl.
-    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0 [*]. subst.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => t t0 [*]. subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
       spec_refl.
       move : iha => [b0 [? ?]]. subst.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by apply AppCong; eauto.
       done.
-    - move => n a0 a1 b0 b1 ha iha hb ihb m ξ []//= t t0[*]. subst.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => t t0[*]. subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
       spec_refl.
       move : iha => [b0 [? ?]]. subst.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by apply PairCong; eauto.
       by asimpl.
-    - move => n p a0 a1 ha iha m ξ []//= p0 t [*]. subst.
+    - move => n p a0 a1 ha iha m ρ hρ []//=;
+               first by antiimp.
+      move => p0 t [*]. subst.
+      have {}/iha := (hρ) => iha.
       spec_refl.
       move : iha => [b0 [? ?]]. subst.
-      eexists. split. by apply ProjCong; eauto.
-      by asimpl.
-    - move => n p A0 A1 B0 B1 ha iha hB ihB m ξ []//= ? t t0 [*]. subst.
+      eexists. split. apply ProjCong; eauto. reflexivity.
+    - move => n p A0 A1 B0 B1 ha iha hB ihB m ρ hρ []//=;
+               first by antiimp.
+      move => ? t t0 [*]. subst.
+      have {}/iha := (hρ) => iha.
+      have /var_or_bot_up {}/ihB := (hρ) => ihB.
       spec_refl.
       move : iha => [b0 [? ?]].
       move : ihB => [c0 [? ?]]. subst.
       eexists. split. by apply BindCong; eauto.
       by asimpl.
-    - move => n n0 ξ []//=. hauto l:on.
-    - move => n i n0 ξ []//=. hauto l:on.
+    - hauto q:on ctrs:R inv:Tm.
+    - move => n i n0 ρ hρ []//=; first by antiimp.
+      hauto l:on.
   Qed.
 End RPar.
+
+(***************** Beta rules only ***********************)
+Module RPar'.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (***************** Beta ***********************)
+  | AppAbs a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App (Abs a0) b0)  (subst_Tm (scons b1 VarTm) a1)
+  | ProjPair p a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
+
+
+  (*************** Congruence ********************)
+  | Var i : R (VarTm i) (VarTm i)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
+  | AppCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App a0 b0) (App a1 b1)
+  | PairCong a0 a1 b0 b1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Pair a0 b0) (Pair a1 b1)
+  | ProjCong p a0 a1 :
+    R a0 a1 ->
+    R (Proj p a0) (Proj p a1)
+  | BindCong p A0 A1 B0 B1:
+    R A0 A1 ->
+    R B0 B1 ->
+    R (TBind p A0 B0) (TBind p A1 B1)
+  | BotCong :
+    R Bot Bot
+  | UnivCong i :
+    R (Univ i) (Univ i).
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+  Lemma refl n (a : Tm n) : R a a.
+  Proof.
+    induction a; hauto lq:on ctrs:R.
+  Qed.
+
+  Lemma AppAbs' n a0 a1 (b0 b1 t : Tm n) :
+    t = subst_Tm (scons b1 VarTm) a1 ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (App (Abs a0) b0) t.
+  Proof. move => ->. apply AppAbs. Qed.
+
+  Lemma ProjPair' n p (a0 a1 b0 b1 : Tm n) t :
+    t = (if p is PL then a1 else b1) ->
+    R a0 a1 ->
+    R b0 b1 ->
+    R (Proj p (Pair a0 b0)) t.
+  Proof.  move => > ->. apply ProjPair. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h.
+    move => *; apply : AppAbs'; eauto; by asimpl.
+    all : qauto ctrs:R use:ProjPair'.
+  Qed.
+
+  Lemma morphing_ren n m p (ρ0 ρ1 : fin n -> Tm m) (ξ : fin m -> fin p) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R ((funcomp (ren_Tm ξ) ρ0) i) ((funcomp (ren_Tm ξ) ρ1) i)).
+  Proof. eauto using renaming. Qed.
+
+  Lemma morphing_ext n m (ρ0 ρ1 : fin n -> Tm m) a b  :
+    R a b ->
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R ((scons a ρ0) i) ((scons b ρ1) i)).
+  Proof. hauto q:on inv:option. Qed.
+
+  Lemma morphing_up n m (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    (forall i, R (up_Tm_Tm ρ0 i) (up_Tm_Tm ρ1 i)).
+  Proof. hauto l:on ctrs:R use:morphing_ext, morphing_ren unfold:up_Tm_Tm. Qed.
+
+  Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    R a b -> R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
+  Proof.
+    move => + h. move : m ρ0 ρ1.
+    elim : n a b /h.
+    - move => *.
+      apply : AppAbs'; eauto using morphing_up.
+      by asimpl.
+    - hauto lq:on ctrs:R use:ProjPair' use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+  Qed.
+
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    R a b ->
+    R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. hauto l:on use:morphing, refl. Qed.
+
+  Lemma cong n (a b : Tm (S n)) c d :
+    R a b ->
+    R c d ->
+    R (subst_Tm (scons c VarTm) a) (subst_Tm (scons d VarTm) b).
+  Proof.
+    move => h0 h1. apply morphing => //=.
+    qauto l:on ctrs:R inv:option.
+  Qed.
+
+  Lemma var_or_bot_imp {n} (a b : Tm n) :
+    var_or_bot a ->
+    a = b -> ~~ var_or_bot b -> False.
+  Proof.
+    hauto lq:on inv:Tm.
+  Qed.
+
+  Lemma var_or_bot_up n m (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    (forall i, var_or_bot (up_Tm_Tm ρ i)).
+  Proof.
+    move => h /= [i|].
+    - asimpl.
+      move /(_ i) in h.
+      rewrite /funcomp.
+      move : (ρ i) h.
+      case => //=.
+    - sfirstorder.
+  Qed.
+
+  Local Ltac antiimp := qauto l:on use:var_or_bot_imp.
+
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    R (subst_Tm ρ a) b -> exists b0, R a b0 /\ subst_Tm ρ b0 = b.
+  Proof.
+    move E : (subst_Tm ρ a) => u hρ h.
+    move : n ρ hρ a E. elim : m u b/h.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => c c0 [+ ?]. subst.
+      case : c => //=; first by antiimp.
+      move => c [?]. subst.
+      spec_refl.
+      have /var_or_bot_up hρ' := hρ.
+      move : iha hρ' => /[apply] iha.
+      move : ihb hρ => /[apply] ihb.
+      spec_refl.
+      move : iha => [c1][ih0]?. subst.
+      move : ihb => [c2][ih1]?. subst.
+      eexists. split.
+      apply AppAbs; eauto.
+      by asimpl.
+    - move => n p a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => p0 []//=; first by antiimp. move => t t0[*].
+      subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
+      spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by eauto using ProjPair.
+      hauto q:on.
+    - move => n i m ρ hρ []//=.
+      hauto l:on.
+    - move => n a0 a1 ha iha m ρ hρ []//=; first by antiimp.
+      move => t [*]. subst.
+      have /var_or_bot_up {}/iha := hρ => iha.
+      spec_refl.
+      move  :iha => [b0 [? ?]]. subst.
+      eexists. split. by apply AbsCong; eauto.
+      by asimpl.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => t t0 [*]. subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply AppCong; eauto.
+      done.
+    - move => n a0 a1 b0 b1 ha iha hb ihb m ρ hρ []//=;
+               first by antiimp.
+      move => t t0[*]. subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      move : ihb => [c0 [? ?]]. subst.
+      eexists. split. by apply PairCong; eauto.
+      by asimpl.
+    - move => n p a0 a1 ha iha m ρ hρ []//=;
+               first by antiimp.
+      move => p0 t [*]. subst.
+      have {}/iha := (hρ) => iha.
+      spec_refl.
+      move : iha => [b0 [? ?]]. subst.
+      eexists. split. apply ProjCong; eauto. reflexivity.
+    - move => n p A0 A1 B0 B1 ha iha hB ihB m ρ hρ []//=;
+               first by antiimp.
+      move => ? t t0 [*]. subst.
+      have {}/iha := (hρ) => iha.
+      have /var_or_bot_up {}/ihB := (hρ) => ihB.
+      spec_refl.
+      move : iha => [b0 [? ?]].
+      move : ihB => [c0 [? ?]]. subst.
+      eexists. split. by apply BindCong; eauto.
+      by asimpl.
+    - hauto q:on ctrs:R inv:Tm.
+    - move => n i n0 ρ hρ []//=; first by antiimp.
+      hauto l:on.
+  Qed.
+End RPar'.
 
 Module ERed.
   Inductive R {n} : Tm n -> Tm n ->  Prop :=
@@ -747,7 +1037,109 @@ Module RPars.
     rtc RPar.R (subst_Tm (scons c VarTm) a) (subst_Tm (scons c VarTm) b).
   Proof. hauto lq:on use:morphing inv:option. Qed.
 
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    rtc RPar.R (subst_Tm ρ a) b -> exists b0, rtc RPar.R a b0 /\ subst_Tm ρ b0 = b.
+  Proof.
+    move E  :(subst_Tm ρ a) => u hρ h.
+    move : a E.
+    elim : u b /h.
+    - sfirstorder.
+    - move => a b c h0 h1 ih1 a0 ?. subst.
+      move /RPar.antirenaming : h0.
+      move /(_ hρ).
+      move => [b0 [h2 ?]]. subst.
+      hauto lq:on rew:off ctrs:rtc.
+  Qed.
+
 End RPars.
+
+Module RPars'.
+
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:RPar'.R use:RPar'.refl.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc RPar'.R a b ->
+    rtc RPar'.R (Abs a) (Abs b).
+  Proof. solve_s. Qed.
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R b0 b1 ->
+    rtc RPar'.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1 :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R b0 b1 ->
+    rtc RPar'.R (TBind p a0 b0) (TBind p a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R b0 b1 ->
+    rtc RPar'.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma ProjCong n p (a0 a1  : Tm n) :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+
+  Lemma renaming n (a0 a1 : Tm n) m (ξ : fin n -> fin m) :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R (ren_Tm ξ a0) (ren_Tm ξ a1).
+  Proof.
+    induction 1.
+    - apply rtc_refl.
+    - eauto using RPar'.renaming, rtc_l.
+  Qed.
+
+  Lemma weakening n (a0 a1 : Tm n) :
+    rtc RPar'.R a0 a1 ->
+    rtc RPar'.R (ren_Tm shift a0) (ren_Tm shift a1).
+  Proof. apply renaming. Qed.
+
+  Lemma Abs_inv n (a : Tm (S n)) b :
+    rtc RPar'.R (Abs a) b -> exists a', b = Abs a' /\ rtc RPar'.R a a'.
+  Proof.
+    move E : (Abs a) => b0 h. move : a E.
+    elim : b0 b / h.
+    - hauto lq:on ctrs:rtc.
+    - hauto lq:on ctrs:rtc inv:RPar'.R, rtc.
+  Qed.
+
+  Lemma morphing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    rtc RPar'.R a b ->
+    rtc RPar'.R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. induction 1; qauto l:on ctrs:rtc use:RPar'.substing. Qed.
+
+  Lemma substing n (a b : Tm (S n)) c :
+    rtc RPar'.R a b ->
+    rtc RPar'.R (subst_Tm (scons c VarTm) a) (subst_Tm (scons c VarTm) b).
+  Proof. hauto lq:on use:morphing inv:option. Qed.
+
+  Lemma antirenaming n m (a : Tm n) (b : Tm m) (ρ : fin n -> Tm m) :
+    (forall i, var_or_bot (ρ i)) ->
+    rtc RPar'.R (subst_Tm ρ a) b -> exists b0, rtc RPar'.R a b0 /\ subst_Tm ρ b0 = b.
+  Proof.
+    move E  :(subst_Tm ρ a) => u hρ h.
+    move : a E.
+    elim : u b /h.
+    - sfirstorder.
+    - move => a b c h0 h1 ih1 a0 ?. subst.
+      move /RPar'.antirenaming : h0.
+      move /(_ hρ).
+      move => [b0 [h2 ?]]. subst.
+      hauto lq:on rew:off ctrs:rtc.
+  Qed.
+
+End RPars'.
 
 Lemma Abs_EPar n a (b : Tm n) :
   EPar.R (Abs a) b ->
@@ -1962,8 +2354,8 @@ end.
 Lemma ne_nf n a : @ne n a -> nf a.
 Proof. elim : a => //=. Qed.
 
-Definition wn {n} (a : Tm n) := exists b, rtc RPar.R a b /\ nf b.
-Definition wne {n} (a : Tm n) := exists b, rtc RPar.R a b /\ ne b.
+Definition wn {n} (a : Tm n) := exists b, rtc RPar'.R a b /\ nf b.
+Definition wne {n} (a : Tm n) := exists b, rtc RPar'.R a b /\ ne b.
 
 (* Weakly neutral implies weakly normal *)
 Lemma wne_wn n a : @wne n a -> wn a.
@@ -1973,7 +2365,7 @@ Proof. sfirstorder use:ne_nf. Qed.
 Lemma nf_wn n v : @nf n v -> wn v.
 Proof. sfirstorder ctrs:rtc. Qed.
 
-Lemma nf_refl n (a b : Tm n) (h : RPar.R a b) : (nf a -> b = a) /\ (ne a -> b = a).
+Lemma nf_refl n (a b : Tm n) (h : RPar'.R a b) : (nf a -> b = a) /\ (ne a -> b = a).
 Proof.
   elim : a b /h => //=; solve [hauto b:on].
 Qed.
@@ -1988,12 +2380,80 @@ Lemma wne_app n (a b : Tm n) :
   wne a -> wn b -> wne (App a b).
 Proof.
   move => [a0 [? ?]] [b0 [? ?]].
-  exists (App a0 b0). hauto b:on use:RPars.AppCong.
+  exists (App a0 b0). hauto b:on drew:off use:RPars'.AppCong.
 Qed.
 
-Lemma wn_abs (a : tm) (h : wn a) : wn (tAbs a).
+Lemma wn_abs n a (h : wn a) : @wn n (Abs a).
 Proof.
   move : h => [v [? ?]].
-  exists (tAbs v).
-  eauto using S_Abs.
+  exists (Abs v).
+  eauto using RPars'.AbsCong.
+Qed.
+
+Lemma wn_bind n p A B : wn A -> wn B -> wn (@TBind n p A B).
+Proof.
+  move => [A0 [? ?]] [B0 [? ?]].
+  exists (TBind p A0 B0).
+  hauto lqb:on use:RPars'.BindCong.
+Qed.
+
+Lemma wn_pair n (a b : Tm n) : wn a -> wn b -> wn (Pair a b).
+Proof.
+  move => [a0 [? ?]] [b0 [? ?]].
+  exists (Pair a0 b0).
+  hauto lqb:on use:RPars'.PairCong.
+Qed.
+
+Lemma wne_proj n p (a : Tm n) : wne a -> wne (Proj p a).
+Proof.
+  move => [a0 [? ?]].
+  exists (Proj p a0). hauto lqb:on use:RPars'.ProjCong.
+Qed.
+
+Create HintDb nfne.
+#[export]Hint Resolve nf_wn ne_nf wne_wn nf_refl : nfne.
+
+Lemma ne_nf_antiren n m (a : Tm n) (ρ : fin n -> Tm m) :
+  (forall i, var_or_bot (ρ i)) ->
+  (ne (subst_Tm ρ a) -> ne a) /\ (nf (subst_Tm ρ a) -> nf a).
+Proof.
+  move : m ρ. elim : n / a => //;
+   hauto b:on drew:off use:RPar.var_or_bot_up.
+Qed.
+
+Lemma wn_antirenaming n m a (ρ : fin n -> Tm m) :
+  (forall i, var_or_bot (ρ i)) ->
+  wn (subst_Tm ρ a) -> wn a.
+Proof.
+  rewrite /wn => hρ.
+  move => [v [rv nfv]].
+  move /RPars'.antirenaming : rv.
+  move /(_ hρ) => [b [hb ?]]. subst.
+  exists b. split => //=.
+  move : nfv.
+  by eapply ne_nf_antiren.
+Qed.
+
+Lemma ext_wn n (a : Tm n) :
+    wn (App a Bot) ->
+    wn a.
+Proof.
+  move E : (App a Bot) => a0 [v [hr hv]].
+  move : a E.
+  move : hv.
+  elim : a0 v / hr.
+  - hauto q:on inv:Tm ctrs:rtc b:on db: nfne.
+  - move => a0 a1 a2 hr0 hr1 ih hnfa2.
+    move /(_ hnfa2) in ih.
+    move => a.
+    case : a0 hr0=>// => b0 b1.
+    elim /RPar'.inv=>// _.
+    + move => a0 a3 b2 b3 ? ? [? ?] ? [? ?]. subst.
+      have ? : b3 = Bot by hauto lq:on inv:RPar'.R. subst.
+      suff : wn (Abs a3) by hauto lq:on ctrs:RPar'.R, rtc unfold:wn.
+      have : wn (subst_Tm (scons Bot VarTm) a3) by sfirstorder.
+      move => h. apply wn_abs.
+      move : h. apply wn_antirenaming.
+      hauto lq:on rew:off inv:option.
+    + hauto q:on inv:RPar'.R ctrs:rtc b:on.
 Qed.
