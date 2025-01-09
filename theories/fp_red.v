@@ -1526,11 +1526,47 @@ Proof.
   - hauto lq:on inv:RPar.R ctrs:RPar.R.
 Qed.
 
+Function tstar' {n} (a : Tm n) :=
+  match a with
+  | VarTm i => a
+  | Abs a => Abs (tstar' a)
+  | App (Abs a) b => subst_Tm (scons (tstar' b) VarTm) (tstar' a)
+  | App a b => App (tstar' a) (tstar' b)
+  | Pair a b => Pair (tstar' a) (tstar' b)
+  | Proj p (Pair a b) => if p is PL then (tstar' a) else (tstar' b)
+  | Proj p a => Proj p (tstar' a)
+  | TBind p a b => TBind p (tstar' a) (tstar' b)
+  | Bot => Bot
+  | Univ i => Univ i
+  end.
+
+Lemma RPar'_triangle n (a : Tm n) : forall b, RPar'.R a b -> RPar'.R b (tstar' a).
+Proof.
+  apply tstar'_ind => {n a}.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+  - hauto lq:on use:RPar'.cong, RPar'.refl ctrs:RPar'.R inv:RPar'.R.
+  - hauto lq:on rew:off ctrs:RPar'.R inv:RPar'.R.
+  - hauto lq:on rew:off inv:RPar'.R ctrs:RPar'.R.
+  - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'.
+  - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
+Qed.
+
 Lemma RPar_diamond n (c a1 b1 : Tm n) :
   RPar.R c a1 ->
   RPar.R c b1 ->
   exists d2, RPar.R a1 d2 /\ RPar.R b1 d2.
 Proof. hauto l:on use:RPar_triangle. Qed.
+
+Lemma RPar'_diamond n (c a1 b1 : Tm n) :
+  RPar'.R c a1 ->
+  RPar'.R c b1 ->
+  exists d2, RPar'.R a1 d2 /\ RPar'.R b1 d2.
+Proof. hauto l:on use:RPar'_triangle. Qed.
 
 Lemma RPar_confluent n (c a1 b1 : Tm n) :
   rtc RPar.R c a1 ->
@@ -2331,7 +2367,7 @@ Proof. hauto lq:on unfold:join use:Pars.substing. Qed.
 Fixpoint ne {n} (a : Tm n) :=
   match a with
   | VarTm i => true
-  | TBind _ A B => nf A && nf B
+  | TBind _ A B => false
   | Bot => false
   | App a b => ne a && nf b
   | Abs a => false
