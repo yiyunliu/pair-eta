@@ -1866,6 +1866,7 @@ Definition prov_extract_spec {n} u (a : Tm n) :=
   | TBind p A B => exists A0 B0, extract a = TBind p A0 B0 /\ rtc Par.R A A0 /\ rtc Par.R B B0
   | Univ i => extract a = Univ i
   | VarTm i => extract a = VarTm i
+  | Bot => extract a = Bot
   | _ => True
   end.
 
@@ -1886,6 +1887,8 @@ Proof.
       rewrite ren_subst_bot in h0.
       rewrite h0.
       eauto.
+    + move => _ /(_ Bot).
+      by rewrite ren_subst_bot.
     + move => i h /(_ Bot).
       by rewrite ren_subst_bot => ->.
   - hauto lq:on.
@@ -2363,12 +2366,11 @@ Lemma join_substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
   join (subst_Tm ρ a) (subst_Tm ρ b).
 Proof. hauto lq:on unfold:join use:Pars.substing. Qed.
 
-
 Fixpoint ne {n} (a : Tm n) :=
   match a with
   | VarTm i => true
   | TBind _ A B => false
-  | Bot => false
+  | Bot => true
   | App a b => ne a && nf b
   | Abs a => false
   | Univ _ => false

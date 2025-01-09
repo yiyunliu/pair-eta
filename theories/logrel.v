@@ -13,7 +13,7 @@ Definition ProdSpace {n} (PA : Tm n -> Prop)
 
 Definition SumSpace {n} (PA : Tm n -> Prop)
   (PF : Tm n -> (Tm n -> Prop) -> Prop) t : Prop :=
-  exists a b, rtc RPar'.R t (Pair a b) /\ PA a /\ (forall PB, PF a PB -> PB b).
+  wne t \/ exists a b, rtc RPar'.R t (Pair a b) /\ PA a /\ (forall PB, PF a PB -> PB b).
 
 Definition BindSpace {n} p := if p is TPi then @ProdSpace n else SumSpace.
 
@@ -289,13 +289,27 @@ Proof.
 Qed.
 
 Lemma ne_prov_inv n (a : Tm n) :
-  ne a -> exists i, prov (VarTm i) a /\ extract a = VarTm i.
+  ne a -> (exists i, prov (VarTm i) a) \/ prov Bot a.
 Proof.
   elim : n /a => //=.
   - hauto lq:on ctrs:prov.
   - hauto lq:on rew:off ctrs:prov b:on.
   - hauto lq:on ctrs:prov.
+  - move => n.
+    have : @prov n Bot Bot by auto using P_Bot.
+    tauto.
 Qed.
+
+Lemma ne_pars_inv n (a b : Tm n) :
+  ne a -> rtc Par.R a b -> (exists i, prov (VarTm i) b) \/ prov Bot b.
+Proof.
+  move /ne_prov_inv.
+  sfirstorder use:prov_pars.
+Qed.
+
+Lemma ne_pars_extract  n (a b : Tm n) :
+  ne a -> rtc Par.R a b -> (exists i, extract b = (VarTm i)) \/ extract b = Bot.
+Proof. hauto lq:on rew:off use:ne_pars_inv, prov_extract. Qed.
 
 Lemma join_bind_ne_contra n p (A : Tm n) B C :
   ne C ->
@@ -303,11 +317,8 @@ Lemma join_bind_ne_contra n p (A : Tm n) B C :
 Proof.
   move => hC [D [h0 h1]].
   move /pars_pi_inv : h0 => [A0 [B0 [h2 [h3 h4]]]].
-  have [i] : exists i, prov (VarTm i) C by sfirstorder use:ne_prov_inv.
-  move => h.
-  have {}h : prov (VarTm i) D by eauto using prov_pars.
-  have : extract D = VarTm i by sfirstorder use:prov_extract.
-  congruence.
+  have : (exists i, extract D = (VarTm i)) \/ extract D = Bot by eauto using ne_pars_extract.
+  sfirstorder.
 Qed.
 
 Lemma join_univ_ne_contra n i C :
@@ -316,11 +327,8 @@ Lemma join_univ_ne_contra n i C :
 Proof.
   move => hC [D [h0 h1]].
   move /pars_univ_inv : h0 => ?.
-  have [j] : exists i, prov (VarTm i) C by sfirstorder use:ne_prov_inv.
-  move => h.
-  have {}h : prov (VarTm j) D by eauto using prov_pars.
-  have : extract D = VarTm j by sfirstorder use:prov_extract.
-  congruence.
+  have : (exists i, extract D = (VarTm i)) \/ extract D = Bot by eauto using ne_pars_extract.
+  sfirstorder.
 Qed.
 
 #[export]Hint Resolve join_univ_ne_contra join_bind_ne_contra join_univ_pi_contra join_symmetric join_transitive : join.
@@ -469,7 +477,7 @@ Lemma InterpUniv_Bind_inv_nopf n i p A B P (h :  ⟦TBind p A B ⟧ i ↘ P) :
 Proof. hauto l:on use:InterpExt_Bind_inv_nopf rew:db:InterpUniv. Qed.
 
 Lemma InterpExt_back_clos n i I (A : Tm n) PA :
-  (forall j,  forall a b, (RPar'.R a b) ->  I j b -> I j a) ->
+  (forall j,  j < i -> forall a b, (RPar'.R a b) ->  I j b -> I j a) ->
     ⟦ A ⟧ i ;; I ↘ PA ->
     forall a b, (RPar'.R a b) ->
            PA b -> PA a.
@@ -486,6 +494,13 @@ Proof.
   - eauto.
   - eauto.
 Qed.
+
+Lemma InterpExt_back_clos_star n i I (A : Tm n) PA :
+  (forall j,  j < i -> forall a b, (RPar'.R a b) ->  I j b -> I j a) ->
+    ⟦ A ⟧ i ;; I ↘ PA ->
+    forall a b, (rtc RPar'.R a b) ->
+           PA b -> PA a.
+Proof. induction 3; hauto l:on use:InterpExt_back_clos. Qed.
 
 Lemma InterpUniv_back_clos n i (A : Tm n) PA :
     ⟦ A ⟧ i ↘ PA ->
@@ -507,19 +522,89 @@ Proof.
   hauto lq:on use:InterpUniv_back_clos.
 Qed.
 
-Definition ρ_ok {n} (Γ : fin n -> Tm n) m (ρ : fin n -> Tm m) := forall i k PA,
+Lemma pars'_wn {n} a b :
+  rtc RPar'.R a b ->
+  @wn n b ->
+  wn a.
+Proof. sfirstorder unfold:wn use:@relations.rtc_transitive. Qed.
+
+(* P identifies a set of "reducibility candidates" *)
+Definition CR {n} (P : Tm n -> Prop) :=
+  (forall a, P a -> wn a) /\
+    (forall a, ne a -> P a).
+
+Lemma adequacy_ext i n I A PA
+  (hI0 : forall j,  j < i -> forall a b, (RPar'.R a b) ->  I j b -> I j a)
+  (hI : forall j, j < i -> CR (I j))
+  (h :  ⟦ A : Tm n ⟧ i ;; I ↘ PA) :
+  CR PA /\ wn A.
+Proof.
+  elim : A PA / h.
+  - hauto unfold:wne use:wne_wn.
+  - move => p A B PA PF hA hPA hTot hRes ihPF.
+    rewrite /CR.
+    have hb : PA Bot by firstorder.
+    repeat split.
+    + case : p => /=.
+      * qauto l:on use:ext_wn unfold:ProdSpace, CR.
+      * rewrite /SumSpace => a []; first by eauto with nfne.
+        move => [q0][q1]*.
+        have : wn q0 /\ wn q1 by hauto q:on.
+        qauto l:on use:wn_pair, pars'_wn.
+    + case : p => /=.
+      * rewrite /ProdSpace.
+        move => a ha c PB hc hPB.
+        have hc' : wn c by sfirstorder.
+        have : wne (App a c) by hauto lq:on use:wne_app ctrs:rtc.
+        have h : (forall a, ne a -> PB a) by sfirstorder.
+        suff : (forall a, wne a -> PB a) by hauto l:on.
+        move => a0 [a1 [h0 h1]].
+        eapply InterpExt_back_clos_star with (b := a1); eauto.
+      * rewrite /SumSpace.
+        move => a ha. left.
+        sfirstorder ctrs:rtc.
+    + have wnA : wn A by firstorder.
+      apply wn_bind => //.
+      apply wn_antirenaming with (ρ := scons Bot VarTm);first by  hauto q:on inv:option.
+      hauto lq:on.
+  - hauto l:on.
+  - hauto lq:on rew:off ctrs:rtc.
+Qed.
+
+Lemma adequacy i n A PA
+  (h :  ⟦ A : Tm n ⟧ i ↘ PA) :
+  CR PA /\ wn A.
+Proof.
+  move : i A PA h.
+  elim /Wf_nat.lt_wf_ind => i ih A PA.
+  simp InterpUniv.
+  apply adequacy_ext.
+  hauto lq:on ctrs:rtc use:InterpUnivN_back_preservation_star.
+  hauto l:on use:InterpExt_Ne rew:db:InterpUniv.
+Qed.
+
+Lemma adequacy_wne i n A PA a : ⟦ A : Tm n ⟧ i ↘ PA -> wne a -> PA a.
+Proof. qauto l:on use:InterpUniv_back_clos_star, adequacy unfold:CR. Qed.
+
+Lemma adequacy_wn i n A PA (h :  ⟦ A : Tm n ⟧ i ↘ PA) a : PA a -> wn a.
+Proof. hauto q:on use:adequacy. Qed.
+
+Definition ρ_ok {n} (Γ : fin n -> Tm n) (ρ : fin n -> Tm 0) := forall i k PA,
   ⟦ subst_Tm ρ (Γ i) ⟧ k ↘ PA -> PA (ρ i).
 
-Definition SemWt {n} Γ (a A : Tm n) := forall m ρ, ρ_ok Γ m ρ -> exists k PA, ⟦ subst_Tm ρ A ⟧ k ↘ PA /\ PA (subst_Tm ρ a).
+Definition SemWt {n} Γ (a A : Tm n) := forall ρ, ρ_ok Γ ρ -> exists k PA, ⟦ subst_Tm ρ A ⟧ k ↘ PA /\ PA (subst_Tm ρ a).
 Notation "Γ ⊨ a ∈ A" := (SemWt Γ a A) (at level 70).
 
 (* Semantic context wellformedness *)
 Definition SemWff {n} Γ := forall (i : fin n), exists j, Γ ⊨ Γ i ∈ Univ j.
 Notation "⊨ Γ" := (SemWff Γ) (at level 70).
 
-Lemma ρ_ok_id n (Γ : fin n -> Tm n)  :
-  ρ_ok Γ n VarTm.
-Proof.  rewrite /ρ_ok. inversion i; subst. Qed.
+Lemma ρ_ok_bot n (Γ : fin n -> Tm n)  :
+  ρ_ok Γ (fun _ => Bot).
+Proof.
+  rewrite /ρ_ok.
+  move => i k PA.
+inversion i; subst. Qed.
 
 Lemma ρ_ok_cons n i (Γ : fin n -> Tm n) ρ a PA A :
   ⟦ subst_Tm ρ A ⟧ i ↘ PA -> PA a ->
