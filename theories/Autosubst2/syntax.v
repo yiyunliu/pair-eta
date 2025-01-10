@@ -41,7 +41,10 @@ Inductive Tm (n_Tm : nat) : Type :=
   | Proj : PTag -> Tm n_Tm -> Tm n_Tm
   | TBind : TTag -> Tm n_Tm -> Tm (S n_Tm) -> Tm n_Tm
   | Bot : Tm n_Tm
-  | Univ : nat -> Tm n_Tm.
+  | Univ : nat -> Tm n_Tm
+  | Bool : Tm n_Tm
+  | BVal : bool -> Tm n_Tm
+  | If : Tm n_Tm -> Tm n_Tm -> Tm n_Tm -> Tm n_Tm.
 
 Lemma congr_Abs {m_Tm : nat} {s0 : Tm (S m_Tm)} {t0 : Tm (S m_Tm)}
   (H0 : s0 = t0) : Abs m_Tm s0 = Abs m_Tm t0.
@@ -94,6 +97,27 @@ Proof.
 exact (eq_trans eq_refl (ap (fun x => Univ m_Tm x) H0)).
 Qed.
 
+Lemma congr_Bool {m_Tm : nat} : Bool m_Tm = Bool m_Tm.
+Proof.
+exact (eq_refl).
+Qed.
+
+Lemma congr_BVal {m_Tm : nat} {s0 : bool} {t0 : bool} (H0 : s0 = t0) :
+  BVal m_Tm s0 = BVal m_Tm t0.
+Proof.
+exact (eq_trans eq_refl (ap (fun x => BVal m_Tm x) H0)).
+Qed.
+
+Lemma congr_If {m_Tm : nat} {s0 : Tm m_Tm} {s1 : Tm m_Tm} {s2 : Tm m_Tm}
+  {t0 : Tm m_Tm} {t1 : Tm m_Tm} {t2 : Tm m_Tm} (H0 : s0 = t0) (H1 : s1 = t1)
+  (H2 : s2 = t2) : If m_Tm s0 s1 s2 = If m_Tm t0 t1 t2.
+Proof.
+exact (eq_trans
+         (eq_trans (eq_trans eq_refl (ap (fun x => If m_Tm x s1 s2) H0))
+            (ap (fun x => If m_Tm t0 x s2) H1))
+         (ap (fun x => If m_Tm t0 t1 x) H2)).
+Qed.
+
 Lemma upRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n) :
   fin (S m) -> fin (S n).
 Proof.
@@ -118,6 +142,10 @@ Fixpoint ren_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
       TBind n_Tm s0 (ren_Tm xi_Tm s1) (ren_Tm (upRen_Tm_Tm xi_Tm) s2)
   | Bot _ => Bot n_Tm
   | Univ _ s0 => Univ n_Tm s0
+  | Bool _ => Bool n_Tm
+  | BVal _ s0 => BVal n_Tm s0
+  | If _ s0 s1 s2 =>
+      If n_Tm (ren_Tm xi_Tm s0) (ren_Tm xi_Tm s1) (ren_Tm xi_Tm s2)
   end.
 
 Lemma up_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm) :
@@ -145,6 +173,11 @@ Fixpoint subst_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
       TBind n_Tm s0 (subst_Tm sigma_Tm s1) (subst_Tm (up_Tm_Tm sigma_Tm) s2)
   | Bot _ => Bot n_Tm
   | Univ _ s0 => Univ n_Tm s0
+  | Bool _ => Bool n_Tm
+  | BVal _ s0 => BVal n_Tm s0
+  | If _ s0 s1 s2 =>
+      If n_Tm (subst_Tm sigma_Tm s0) (subst_Tm sigma_Tm s1)
+        (subst_Tm sigma_Tm s2)
   end.
 
 Lemma upId_Tm_Tm {m_Tm : nat} (sigma : fin m_Tm -> Tm m_Tm)
@@ -185,6 +218,11 @@ subst_Tm sigma_Tm s = s :=
         (idSubst_Tm (up_Tm_Tm sigma_Tm) (upId_Tm_Tm _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (idSubst_Tm sigma_Tm Eq_Tm s0) (idSubst_Tm sigma_Tm Eq_Tm s1)
+        (idSubst_Tm sigma_Tm Eq_Tm s2)
   end.
 
 Lemma upExtRen_Tm_Tm {m : nat} {n : nat} (xi : fin m -> fin n)
@@ -229,6 +267,11 @@ Fixpoint extRen_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
            (upExtRen_Tm_Tm _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (extRen_Tm xi_Tm zeta_Tm Eq_Tm s0)
+        (extRen_Tm xi_Tm zeta_Tm Eq_Tm s1) (extRen_Tm xi_Tm zeta_Tm Eq_Tm s2)
   end.
 
 Lemma upExt_Tm_Tm {m : nat} {n_Tm : nat} (sigma : fin m -> Tm n_Tm)
@@ -274,6 +317,11 @@ Fixpoint ext_Tm {m_Tm : nat} {n_Tm : nat} (sigma_Tm : fin m_Tm -> Tm n_Tm)
            s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (ext_Tm sigma_Tm tau_Tm Eq_Tm s0)
+        (ext_Tm sigma_Tm tau_Tm Eq_Tm s1) (ext_Tm sigma_Tm tau_Tm Eq_Tm s2)
   end.
 
 Lemma up_ren_ren_Tm_Tm {k : nat} {l : nat} {m : nat} (xi : fin k -> fin l)
@@ -319,6 +367,12 @@ Fixpoint compRenRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
            (upRen_Tm_Tm rho_Tm) (up_ren_ren _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s0)
+        (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s1)
+        (compRenRen_Tm xi_Tm zeta_Tm rho_Tm Eq_Tm s2)
   end.
 
 Lemma up_ren_subst_Tm_Tm {k : nat} {l : nat} {m_Tm : nat}
@@ -375,6 +429,12 @@ Fixpoint compRenSubst_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
            (up_Tm_Tm theta_Tm) (up_ren_subst_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s0)
+        (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s1)
+        (compRenSubst_Tm xi_Tm tau_Tm theta_Tm Eq_Tm s2)
   end.
 
 Lemma up_subst_ren_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -452,6 +512,12 @@ ren_Tm zeta_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
            (up_Tm_Tm theta_Tm) (up_subst_ren_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s0)
+        (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s1)
+        (compSubstRen_Tm sigma_Tm zeta_Tm theta_Tm Eq_Tm s2)
   end.
 
 Lemma up_subst_subst_Tm_Tm {k : nat} {l_Tm : nat} {m_Tm : nat}
@@ -530,6 +596,12 @@ subst_Tm tau_Tm (subst_Tm sigma_Tm s) = subst_Tm theta_Tm s :=
            (up_Tm_Tm theta_Tm) (up_subst_subst_Tm_Tm _ _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s0)
+        (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s1)
+        (compSubstSubst_Tm sigma_Tm tau_Tm theta_Tm Eq_Tm s2)
   end.
 
 Lemma renRen_Tm {k_Tm : nat} {l_Tm : nat} {m_Tm : nat}
@@ -646,6 +718,12 @@ Fixpoint rinst_inst_Tm {m_Tm : nat} {n_Tm : nat}
            (rinstInst_up_Tm_Tm _ _ Eq_Tm) s2)
   | Bot _ => congr_Bot
   | Univ _ s0 => congr_Univ (eq_refl s0)
+  | Bool _ => congr_Bool
+  | BVal _ s0 => congr_BVal (eq_refl s0)
+  | If _ s0 s1 s2 =>
+      congr_If (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s0)
+        (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s1)
+        (rinst_inst_Tm xi_Tm sigma_Tm Eq_Tm s2)
   end.
 
 Lemma rinstInst'_Tm {m_Tm : nat} {n_Tm : nat} (xi_Tm : fin m_Tm -> fin n_Tm)
@@ -843,6 +921,12 @@ Import
 Core.
 
 Arguments VarTm {n_Tm}.
+
+Arguments If {n_Tm}.
+
+Arguments BVal {n_Tm}.
+
+Arguments Bool {n_Tm}.
 
 Arguments Univ {n_Tm}.
 

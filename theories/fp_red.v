@@ -33,6 +33,8 @@ Module Par.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
+  | AppBool b a :
+    R (App (BVal b) a) (BVal b)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -40,7 +42,24 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-
+  | ProjBool p b :
+    R (Proj p (BVal b)) (BVal b)
+  | IfAbs a0 a1 b0 b1 c0 c1 d0 d1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R d0 d1 ->
+    R (If (Abs a0) b0 c0) (Abs (If a0 (ren_Tm shift b0) (ren_Tm shift c0)))
+  | IfPair a0 a1 b0 b1 c0 c1 d0 d1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R d0 d1 ->
+    R (If (Pair a0 b0) c0 d0) (Pair (If a0 c0 d0) (If b0 c0 d0))
+  | IfBool a b0 b1 c0 c1 :
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (BVal a) b0 c0) (if a then b1 else c1)
   (****************** Eta ***********************)
   | AppEta a0 a1 :
     R a0 a1 ->
