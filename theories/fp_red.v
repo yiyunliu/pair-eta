@@ -243,6 +243,25 @@ Module Pars.
       move => [b0 [h2 ?]]. subst.
       hauto lq:on rew:off ctrs:rtc.
   Qed.
+
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:Par.R use:Par.refl.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+  Lemma ProjCong n p (a0 a1 : Tm n) :
+    rtc Par.R a0 a1 ->
+    rtc Par.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc Par.R a0 a1 ->
+    rtc Par.R b0 b1 ->
+    rtc Par.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
 End Pars.
 
 Definition var_or_bot {n} (a : Tm n) :=
@@ -2494,4 +2513,50 @@ Proof.
       move : h. apply wn_antirenaming.
       hauto lq:on rew:off inv:option.
     + hauto q:on inv:RPar'.R ctrs:rtc b:on.
+Qed.
+
+Module Join.
+  Lemma ProjCong p n (a0 a1 : Tm n) :
+    join a0 a1 ->
+    join (Proj p a0) (Proj p a1).
+  Proof. hauto lq:on use:Pars.ProjCong unfold:join. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    join a0 a1 ->
+    join b0 b1 ->
+    join (Pair a0 b0) (Pair a1 b1).
+  Proof. hauto lq:on use:Pars.PairCong unfold:join. Qed.
+
+  Lemma FromPar n (a b : Tm n) :
+    Par.R a b ->
+    join a b.
+  Proof.
+    hauto lq:on ctrs:rtc use:rtc_once.
+  Qed.
+End Join.
+
+Lemma pair_eq n (a0 a1 b : Tm n) :
+  join (Pair a0 a1) b <-> join a0 (Proj PL b) /\ join a1 (Proj PR b).
+Proof.
+  split.
+  - move => h.
+    have /Join.ProjCong {}h := h.
+    have h0 : forall p, join (if p is PL then a0 else a1) (Proj p (Pair a0 a1))
+                     by hauto lq:on use:join_symmetric, Join.FromPar, Par.ProjPair', Par.refl.
+    hauto lq:on rew:off use:join_transitive, join_symmetric.
+  - move => [h0 h1].
+    move : h0 h1.
+    move : Join.PairCong; repeat move/[apply].
+    move /join_transitive. apply. apply join_symmetric.
+    apply Join.FromPar. hauto lq:on ctrs:Par.R use:Par.refl.
+Qed.
+
+Lemma join_pair_inj n (a0 a1 b0 b1 : Tm n) :
+  join (Pair a0 a1) (Pair b0 b1) <-> join a0 b0 /\ join a1 b1.
+Proof.
+  split; last by hauto lq:on use:Join.PairCong.
+  move /pair_eq => [h0 h1].
+  have : join (Proj PL (Pair b0 b1)) b0 by hauto lq:on use:Join.FromPar, Par.refl, Par.ProjPair'.
+  have : join (Proj PR (Pair b0 b1)) b1 by hauto lq:on use:Join.FromPar, Par.refl, Par.ProjPair'.
+  eauto using join_transitive.
 Qed.
