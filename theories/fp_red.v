@@ -262,6 +262,17 @@ Module Pars.
     rtc Par.R (Pair a0 b0) (Pair a1 b1).
   Proof. solve_s. Qed.
 
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc Par.R a0 a1 ->
+    rtc Par.R b0 b1 ->
+    rtc Par.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc Par.R a b ->
+    rtc Par.R (Abs a) (Abs b).
+  Proof. solve_s. Qed.
+
 End Pars.
 
 Definition var_or_bot {n} (a : Tm n) :=
@@ -2527,6 +2538,29 @@ Module Join.
     join (Pair a0 b0) (Pair a1 b1).
   Proof. hauto lq:on use:Pars.PairCong unfold:join. Qed.
 
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    join a0 a1 ->
+    join b0 b1 ->
+    join (App a0 b0) (App a1 b1).
+  Proof. hauto lq:on use:Pars.AppCong. Qed.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    join a b ->
+    join (Abs a) (Abs b).
+  Proof. hauto lq:on use:Pars.AbsCong. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    join a b -> join (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    induction 1; hauto lq:on use:Pars.renaming.
+  Qed.
+
+  Lemma weakening n (a b : Tm n)  :
+    join a b -> join (ren_Tm shift a) (ren_Tm shift b).
+  Proof.
+    apply renaming.
+  Qed.
+
   Lemma FromPar n (a b : Tm n) :
     Par.R a b ->
     join a b.
@@ -2534,6 +2568,22 @@ Module Join.
     hauto lq:on ctrs:rtc use:rtc_once.
   Qed.
 End Join.
+
+Lemma abs_eq n a (b : Tm n) :
+  join (Abs a) b <-> join a (App (ren_Tm shift b) (VarTm var_zero)).
+Proof.
+  split.
+  - move => /Join.weakening h.
+    have {h} : join (App (ren_Tm shift (Abs a)) (VarTm var_zero)) (App (ren_Tm shift b) (VarTm var_zero))
+      by hauto l:on use:Join.AppCong, join_refl.
+    simpl.
+    move => ?. apply : join_transitive; eauto.
+    apply join_symmetric. apply Join.FromPar.
+    apply : Par.AppAbs'; eauto using Par.refl. by asimpl.
+  - move /Join.AbsCong.
+    move /join_transitive. apply.
+    apply join_symmetric. apply Join.FromPar. apply Par.AppEta. apply Par.refl.
+Qed.
 
 Lemma pair_eq n (a0 a1 b : Tm n) :
   join (Pair a0 a1) b <-> join a0 (Proj PL b) /\ join a1 (Proj PR b).
