@@ -869,3 +869,135 @@ Proof.
       eauto using InterpUnivN_back_preservation_star.
     + hauto lq:on use:@relations.rtc_r, InterpUniv_back_clos_star.
 Qed.
+
+Lemma ne_nf_preservation n (a b : Tm n) : ERed.R b a -> (ne a -> ne b) /\ (nf a -> nf b).
+Proof.
+  move => h. elim : n b a /h => //=.
+  - move => n a.
+    split => //=.
+    hauto lqb:on use:ne_nf_ren db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+  - hauto lqb:on db:nfne.
+Qed.
+
+Fixpoint size_tm {n} (a : Tm n) :=
+  match a with
+  | VarTm _ => 1
+  | TBind _ A B => 1 + Nat.add (size_tm A) (size_tm B)
+  | Abs a => 1 + size_tm a
+  | App a b => 1 + Nat.add (size_tm a) (size_tm b)
+  | Proj p a => 1 + size_tm a
+  | Pair a b => 1 + Nat.add (size_tm a) (size_tm b)
+  | Bot => 1
+  | Univ _ => 1
+  end.
+
+Lemma size_tm_ren n m (ξ : fin n -> fin m) a : size_tm (ren_Tm ξ a) = size_tm a.
+Proof.
+  move : m ξ. elim : n / a => //=; scongruence.
+Qed.
+
+#[export]Hint Rewrite size_tm_ren : size_tm.
+
+Lemma size_η_lt n (a b : Tm n) :
+  ERed.R b a ->
+  size_tm b < size_tm a.
+Proof.
+  move => h. elim : b a / h => //=; hauto l:on rew:db:size_tm.
+Qed.
+
+Lemma ered_local_confluence n (a b c : Tm n) :
+  ERed.R b a ->
+  ERed.R c a ->
+  exists d, rtc ERed.R d b  /\ rtc ERed.R d c.
+Proof.
+  move => h. move : c.
+  elim : n b a / h => n.
+  - move => a c.
+    elim /ERed.inv => //= _.
+    + move => ? ? [*]. subst.
+      have : subst_Tm (scons Bot VarTm) (ren_Tm shift c) = (subst_Tm (scons Bot VarTm) (ren_Tm shift a))
+        by congruence.
+      asimpl => ?. subst.
+      eauto using rtc_refl.
+    + move => a0 a1 ha ? [*]. subst.
+      elim /ERed.inv : ha => //= _.
+      * move => a1 a2 b0 ha ? [*]. subst.
+        have [a2 [h0 h1]] : exists a2, ERed.R a2 a /\ a1 = ren_Tm shift a2 by admit. subst.
+        eexists. split; cycle 1.
+        apply : relations.rtc_r; cycle 1.
+        apply ERed.AppEta.
+        apply rtc_refl.
+        eauto using relations.rtc_once.
+      * hauto q:on ctrs:rtc, ERed.R inv:ERed.R.
+  - move => a c ha.
+    elim /ERed.inv : ha => //= _.
+    + hauto l:on.
+    + move => a0 a1 b0 ha ? [*]. subst.
+      elim /ERed.inv : ha => //= _.
+      move => p a1 a2 ha ? [*]. subst.
+      exists a1. split. by apply relations.rtc_once.
+      apply : rtc_l. apply ERed.PairEta.
+      apply : rtc_l. apply ERed.PairCong1. eauto using ERed.ProjCong.
+      apply rtc_refl.
+    + move => a0 b0 b1 ha ? [*]. subst.
+      elim /ERed.inv : ha => //= _ p a0 a1 h ? [*]. subst.
+      exists a0. split; first by apply relations.rtc_once.
+      apply : rtc_l; first by apply ERed.PairEta.
+      apply relations.rtc_once.
+      hauto lq:on ctrs:ERed.R.
+  - move => a0 a1 ha iha c.
+    elim /ERed.inv => //= _.
+    + move => a2 ? [*]. subst.
+      elim /ERed.inv : ha => //=_.
+      * move => a1 a2 b0 ha ? [*] {iha}. subst.
+        have [a0 [h0 h1]] : exists a0, ERed.R a0 c /\ a1 = ren_Tm shift a0 by admit. subst.
+        exists a0. split; last by apply relations.rtc_once.
+        apply relations.rtc_once. apply ERed.AppEta.
+      * hauto q:on inv:ERed.R.
+    + hauto l:on use:EReds.AbsCong.
+  - move => a0 a1 b ha iha c.
+    elim /ERed.inv => //= _.
+    + hauto lq:on ctrs:rtc use:EReds.AppCong.
+    + hauto lq:on use:@relations.rtc_once ctrs:ERed.R.
+  - move => a b0 b1 hb ihb c.
+    elim /ERed.inv => //=_.
+    + move => a0 a1 a2 ha ? [*]. subst.
+      move {ihb}. exists (App a0 b0).
+      hauto lq:on use:@relations.rtc_once ctrs:ERed.R.
+    + hauto lq:on ctrs:rtc use:EReds.AppCong.
+  - move => a0 a1 b ha iha c.
+    elim /ERed.inv => //= _.
+    + move => ? ?[*]. subst.
+      elim /ERed.inv : ha => //= _ p a1 a2 h ? [*]. subst.
+      exists a1. split; last by apply relations.rtc_once.
+      apply : rtc_l. apply ERed.PairEta.
+      apply relations.rtc_once. hauto lq:on ctrs:ERed.R.
+    + hauto lq:on ctrs:rtc use:EReds.PairCong.
+    + hauto lq:on ctrs:ERed.R use:@relations.rtc_once.
+  - move => a b0 b1 hb hc c. elim /ERed.inv => //= _.
+    + move => ? ? [*]. subst.
+      elim /ERed.inv : hb => //= _ p a0 a1 ha ? [*]. subst.
+      move {hc}.
+      exists a0. split; last by apply relations.rtc_once.
+      apply : rtc_l; first by apply ERed.PairEta.
+      hauto lq:on ctrs:ERed.R use:@relations.rtc_once.
+    + hauto lq:on ctrs:ERed.R use:@relations.rtc_once.
+    + hauto lq:on ctrs:rtc use:EReds.PairCong.
+  - qauto l:on inv:ERed.R use:EReds.ProjCong.
+  - move => p A0 A1 B hA ihA.
+    move => c. elim/ERed.inv => //=.
+    + hauto lq:on ctrs:rtc use:EReds.BindCong.
+    + hauto lq:on ctrs:ERed.R use:@relations.rtc_once.
+  - move => p A B0 B1 hB ihB c.
+    elim /ERed.inv => //=.
+    + hauto lq:on ctrs:ERed.R use:@relations.rtc_once.
+    + hauto lq:on ctrs:rtc use:EReds.BindCong.
+Admitted.

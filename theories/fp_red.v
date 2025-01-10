@@ -766,6 +766,8 @@ Module ERed.
     R B0 B1 ->
     R (TBind p A B0) (TBind p A B1).
 
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
   Lemma AppEta' n a (u : Tm n) :
     u = (Abs (App (ren_Tm shift a) (VarTm var_zero))) ->
     R a u.
@@ -1764,15 +1766,13 @@ Qed.
 Lemma prov_pair n (u : Tm n) a : prov u a <-> prov u (Pair (Proj PL a) (Proj PR a)).
 Proof. hauto lq:on inv:prov ctrs:prov. Qed.
 
-Derive Dependent Inversion inv with (forall n (a b : Tm n), ERed.R a b) Sort Prop.
-
 Lemma prov_ered n (u : Tm n) a b : prov u a -> ERed.R a b -> prov u b.
 Proof.
   move => h.
   move : b.
   elim : u a / h.
   - move => p A A0 B B0 hA hB b.
-    elim /inv => // _.
+    elim /ERed.inv => // _.
     + move => a0 *. subst.
       rewrite -prov_lam.
       by constructor.
@@ -1782,7 +1782,7 @@ Proof.
     + qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
     + qauto l:on ctrs:prov use:@rtc_r, ERed_EPar, EPar_Par.
   - move => h a ha iha b.
-    elim /inv => // _.
+    elim /ERed.inv => // _.
     + move => a0 *. subst.
       rewrite -prov_lam.
       by constructor.
@@ -1792,7 +1792,7 @@ Proof.
     + hauto lq:on ctrs:prov use:ERed.substing.
   - hauto lq:on inv:ERed.R, prov ctrs:prov.
   - move => h a b ha iha hb ihb b0.
-    elim /inv => //_.
+    elim /ERed.inv => //_.
     + move => a0 *. subst.
       rewrite -prov_lam.
       by constructor.
