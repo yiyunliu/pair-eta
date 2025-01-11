@@ -33,8 +33,8 @@ Module Par.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | AppBool b a :
-    R (App (BVal b) a) (BVal b)
+  (* | AppBool b a : *)
+  (*   R (App (BVal b) a) (BVal b) *)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -42,20 +42,20 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-  | ProjBool p b :
-    R (Proj p (BVal b)) (BVal b)
-  | IfAbs a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R d0 d1 ->
-    R (If (Abs a0) b0 c0) (Abs (If a0 (ren_Tm shift b0) (ren_Tm shift c0)))
-  | IfPair a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R d0 d1 ->
-    R (If (Pair a0 b0) c0 d0) (Pair (If a0 c0 d0) (If b0 c0 d0))
+  (* | ProjBool p b : *)
+  (*   R (Proj p (BVal b)) (BVal b) *)
+  (* | IfAbs a0 a1 b0 b1 c0 c1 d0 d1 : *)
+  (*   R a0 a1 -> *)
+  (*   R b0 b1 -> *)
+  (*   R c0 c1 -> *)
+  (*   R d0 d1 -> *)
+  (*   R (If (Abs a0) b0 c0) (Abs (If a0 (ren_Tm shift b0) (ren_Tm shift c0))) *)
+  (* | IfPair a0 a1 b0 b1 c0 c1 d0 d1 : *)
+  (*   R a0 a1 -> *)
+  (*   R b0 b1 -> *)
+  (*   R c0 c1 -> *)
+  (*   R d0 d1 -> *)
+  (*   R (If (Pair a0 b0) c0 d0) (Pair (If a0 c0 d0) (If b0 c0 d0)) *)
   | IfBool a b0 b1 c0 c1 :
     R b0 b1 ->
     R c0 c1 ->
@@ -92,7 +92,16 @@ Module Par.
   | BotCong :
     R Bot Bot
   | UnivCong i :
-    R (Univ i) (Univ i).
+    R (Univ i) (Univ i)
+  | BoolCong :
+    R Bool Bool
+  | BValCong b :
+    R (BVal b) (BVal b)
+  | IfCong a0 a1 b0 b1 c0 c1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If a0 b0 c0) (If a1 b1 c1).
 
   Lemma refl n (a : Tm n) : R a a.
     elim : n /a; hauto ctrs:R.
@@ -112,6 +121,13 @@ Module Par.
     R (Proj p (Pair a0 b0)) t.
   Proof.  move => > ->. apply ProjPair. Qed.
 
+  Lemma IfBool' n a b0 b1 c0 c1 u :
+    u = (if a then (b1 : Tm n) else c1) ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (BVal a) b0 c0) u.
+  Proof. move => ->. apply IfBool. Qed.
+
   Lemma AppEta' n (a0 a1 b : Tm n) :
     b = (Abs (App (ren_Tm shift a1) (VarTm var_zero))) ->
     R a0 a1 ->
@@ -126,7 +142,7 @@ Module Par.
     move => *; apply : AppAbs'; eauto; by asimpl.
     all : match goal with
           | [ |- context[var_zero]] => move => *; apply : AppEta'; eauto; by asimpl
-          | _ => qauto ctrs:R use:ProjPair'
+          | _ => qauto ctrs:R use:ProjPair', IfBool'
           end.
   Qed.
 
@@ -143,6 +159,7 @@ Module Par.
     - hauto lq:on rew:off ctrs:R.
     - hauto l:on inv:option use:renaming ctrs:R.
     - hauto lq:on use:ProjPair'.
+    - hauto q:on use:IfBool'.
     - move => n a0 a1 ha iha m ρ0 ρ1 hρ /=.
       apply : AppEta'; eauto. by asimpl.
     - hauto lq:on ctrs:R.
@@ -154,6 +171,9 @@ Module Par.
     - hauto l:on inv:option ctrs:R use:renaming.
     - sfirstorder.
     - sfirstorder.
+    - sfirstorder.
+    - sfirstorder.
+    - hauto lq:on ctrs:R.
   Qed.
 
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
@@ -193,6 +213,12 @@ Module Par.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
+    - move => n a b0 b1 c0 c1 hb ihb hc ihc m ξ []//= p0 p1 p2 [h *]. subst.
+      spec_refl.
+      move : ihb => [b0 [? ?]].
+      move : ihc => [c0 [? ?]]. subst.
+      case : p0 h => //=.
+      hauto q:on use:IfBool'.
     - move => n a0 a1 ha iha m ξ a ?. subst.
       spec_refl. move : iha => [a0 [? ?]]. subst.
       eexists. split. apply AppEta; eauto.
@@ -233,6 +259,11 @@ Module Par.
       by asimpl.
     - move => n n0 ξ []//=. hauto l:on.
     - move => n i n0 ξ []//=. hauto l:on.
+    - move => n m ξ []//=. hauto l:on.
+    - move => n b m ξ []//=. hauto l:on.
+    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//= t t0 t1[*]. subst.
+      spec_refl.
+      qauto l:on ctrs:R.
   Qed.
 
 End Par.
@@ -321,6 +352,10 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
+  | IfBool a b0 b1 c0 c1 :
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (BVal a) b0 c0) (if a then b1 else c1)
 
 
   (*************** Congruence ********************)
@@ -346,7 +381,16 @@ Module RPar.
   | BotCong :
     R Bot Bot
   | UnivCong i :
-    R (Univ i) (Univ i).
+    R (Univ i) (Univ i)
+  | BoolCong :
+    R Bool Bool
+  | BValCong b :
+    R (BVal b) (BVal b)
+  | IfCong a0 a1 b0 b1 c0 c1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If a0 b0 c0) (If a1 b1 c1).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -369,13 +413,21 @@ Module RPar.
     R (Proj p (Pair a0 b0)) t.
   Proof.  move => > ->. apply ProjPair. Qed.
 
+  Lemma IfBool' n a b0 b1 c0 c1 u :
+    u = (if a then (b1 : Tm n) else c1) ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (BVal a) b0 c0) u.
+  Proof. move => ->. apply IfBool. Qed.
+
+
   Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
     R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
   Proof.
     move => h. move : m ξ.
     elim : n a b /h.
     move => *; apply : AppAbs'; eauto; by asimpl.
-    all : qauto ctrs:R use:ProjPair'.
+    all : qauto ctrs:R use:ProjPair', IfBool'.
   Qed.
 
   Lemma morphing_ren n m p (ρ0 ρ1 : fin n -> Tm m) (ξ : fin m -> fin p) :
@@ -406,12 +458,16 @@ Module RPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:ProjPair' use:morphing_up.
+    - hauto lq:on ctrs:R use:IfBool' use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
   Qed.
@@ -434,7 +490,7 @@ Module RPar.
     var_or_bot a ->
     a = b -> ~~ var_or_bot b -> False.
   Proof.
-    hauto lq:on inv:Tm.
+    hauto l:on inv:Tm.
   Qed.
 
   Lemma var_or_bot_up n m (ρ : fin n -> Tm m) :
@@ -504,6 +560,14 @@ Module RPar.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
+    - move => n a b0 b1 c0 c1 hb ihb hc ihc m ρ hρ []//=; first by antiimp.
+      move => t t0 t1 [h *]. subst.
+      case : t h => //=; first by antiimp.
+      move => b [*]. subst.
+      have {}/ihb := (hρ) => ihb.
+      have {}/ihc := (hρ) => ihc.
+      spec_refl.
+      hauto q:on use:IfBool.
     - move => n i m ρ hρ []//=.
       hauto l:on.
     - move => n a0 a1 ha iha m ρ hρ []//=; first by antiimp.
@@ -553,6 +617,17 @@ Module RPar.
     - hauto q:on ctrs:R inv:Tm.
     - move => n i n0 ρ hρ []//=; first by antiimp.
       hauto l:on.
+    - move => n m ρ hρ []//=; first by antiimp.
+      hauto lq:on ctrs:R.
+    - move => n b m ρ hρ []//; first by antiimp.
+      hauto lq:on ctrs:R.
+    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ hρ []//=; first by antiimp.
+      move => t t0 t1 [*]. subst.
+      have {}/iha := (hρ) => iha.
+      have {}/ihb := (hρ) => ihb.
+      have {}/ihc := (hρ) => ihc.
+      spec_refl.
+      hauto lq:on ctrs:R.
   Qed.
 End RPar.
 
