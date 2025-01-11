@@ -1374,6 +1374,11 @@ End RPars.
 
 (* End RPars'. *)
 
+(* (forall p, exists d, rtc RPar.R (Proj p c) d /\ EPar.R (if p is PL then a else b) d) *)
+(* (exists d0 d1, rtc RPar.R (App (ren_Tm shift c) (VarTm var_zero)) *)
+(*                 (Pair (App (ren_Tm shift d0) (VarTm var_zero))(App (ren_Tm shift d1) (VarTm var_zero))) /\ *)
+(*     EPar.R a d0 /\ EPar.R b d1) *)
+
 Lemma Abs_EPar n a (b : Tm n) :
   EPar.R (Abs a) b ->
   (exists d, EPar.R a d /\
@@ -1425,6 +1430,32 @@ Proof.
     + exists a1. split => // p.
       apply rtc_once. apply : RPar.ProjAbs; eauto using RPar.refl.
 Qed.
+
+Lemma Abs_EPar_If n (a : Tm (S n)) q :
+  EPar.R (Abs a) q ->
+  exists d, EPar.R a d /\
+         forall b c, rtc RPar.R (If q b c) (Abs (If d (ren_Tm shift b) (ren_Tm shift c))).
+Proof.
+  move E : (Abs a) => u h.
+  move : a E.
+  elim : n u q /h => //= n.
+  - move => a0 a1 ha _ b ?. subst.
+    move /Abs_EPar : ha.
+    move => [[d [h0 h1]] _].
+    exists d.
+    split => // b0 c.
+    apply : rtc_l.
+    apply RPar.IfAbs; auto using RPar.refl.
+    apply RPars.AbsCong.
+    apply RPars.IfCong; auto using rtc_refl.
+  - move => a0 a1 ha _ a ?. subst.
+    move /Abs_EPar : ha => [_ [d [h0 h1]]].
+    exists d. split => //.
+    move => b c.
+    apply : rtc_l.
+    apply RPar.IfPair; auto using RPar.refl.
+Admitted.
+
 
 Lemma Pair_EPar n (a b c : Tm n) :
   EPar.R (Pair a b) c ->
@@ -1528,7 +1559,9 @@ Proof.
       split.
       hauto lq:on use:relations.rtc_transitive, RPars.AppCong.
       apply EPar.PairCong; by apply EPar.AppCong.
-    + admit.
+    + case : a0 ha iha => //=.
+      move => b ha hc b3 a0 [*]. subst.
+      admit.
     + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
   - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
   - move => n p a b0 h0 ih0 b1.
@@ -1543,7 +1576,8 @@ Proof.
       move /Pair_EPar : ih1 => [/(_ p)[d [ihd ihd']] _].
       exists d. split => //.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
-    + admit.
+    + move => p0 b2 [*]. subst.
+      admit.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
   - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.BindCong.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
@@ -1552,7 +1586,15 @@ Proof.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
   - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc u.
     elim /RPar.inv => //= _.
-    + admit.
+    + move => a2 a3 b2 b3 c2 c3 ha2 hb2 hc2 [*]. subst.
+      move /(_ _ ltac:(by eauto using RPar.AbsCong)) : iha => [c [ih0 ih1]].
+      move /Abs_EPar : ih1 => [[d [ih2 ih3]]  _].
+      have {}/ihb := hb2. move => [b4 [ihb0 ihb1]].
+      have {}/ihc := hc2. move => [c4 [ihc0 ihc1]].
+
+      exists (Abs (If d (ren_Tm shift b4) (ren_Tm shift c4))).
+      split. admit.
+      hauto lq:on ctrs:EPar.R use:EPar.renaming.
     + admit.
     + admit.
     + (* Need the rule that if commutes with abs *)
