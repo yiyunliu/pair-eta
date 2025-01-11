@@ -33,8 +33,6 @@ Module Par.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | AppBool b a :
-    R (App (BVal b) a) (BVal b)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -42,19 +40,6 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-  | ProjBool p b :
-    R (Proj p (BVal b)) (BVal b)
-  | IfAbs (a0 a1 : Tm (S n)) b0 b1 c0 c1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R (If (Abs a0) b0 c0) (Abs (If a1 (ren_Tm shift b1) (ren_Tm shift c1)))
-  | IfPair a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R d0 d1 ->
-    R (If (Pair a0 b0) c0 d0) (Pair (If a1 c1 d1) (If b1 c1 d1))
   | IfBool a b0 b1 c0 c1 :
     R b0 b1 ->
     R c0 c1 ->
@@ -133,13 +118,6 @@ Module Par.
     R a0 b.
   Proof. move => ->; apply AppEta. Qed.
 
-  Lemma IfAbs' n (a0 a1  : Tm (S n)) (b0 b1 c0 c1 : Tm n)  u :
-    u = (Abs (If a1 (ren_Tm shift b1) (ren_Tm shift c1))) ->
-    @R (S n) a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R (If (Abs a0) b0 c0) u.
-  Proof. move => ->. apply IfAbs. Qed.
 
   Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
     R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
@@ -149,7 +127,6 @@ Module Par.
     move => *; apply : AppAbs'; eauto; by asimpl.
     all : match goal with
           | [ |- context[var_zero]] => move => *; apply : AppEta'; eauto; by asimpl
-          | [ |- context[ren_Tm]] => move => * /=; apply : IfAbs'; eauto; by asimpl
           | _ => qauto ctrs:R use:ProjPair', IfBool'
           end.
   Qed.
@@ -164,14 +141,8 @@ Module Par.
       by asimpl.
       hauto l:on use:renaming inv:option.
     - hauto lq:on rew:off ctrs:R.
-    - hauto lq:on rew:off ctrs:R.
     - hauto l:on inv:option use:renaming ctrs:R.
     - hauto lq:on use:ProjPair'.
-    - hauto lq:on rew:off ctrs:R.
-    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ0 ρ1 hρ /=.
-      eapply IfAbs' with (a1 := (subst_Tm (up_Tm_Tm ρ1) a1)); eauto. by asimpl.
-      hauto l:on use:renaming inv:option.
-    - qauto l:on ctrs:R.
     - hauto q:on use:IfBool'.
     - move => n a0 a1 ha iha m ρ0 ρ1 hρ /=.
       apply : AppEta'; eauto. by asimpl.
@@ -217,8 +188,6 @@ Module Par.
       eexists. split.
       apply AppPair; hauto. subst.
       by asimpl.
-    - move => n b a m ξ []//=.
-      hauto q:on ctrs:R inv:Tm.
     - move => n p a0 a1 ha iha m ξ []//= p0 []//= t [*]. subst.
       spec_refl. move : iha => [b0 [? ?]]. subst.
       eexists. split. apply ProjAbs; eauto. by asimpl.
@@ -228,23 +197,6 @@ Module Par.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
-    - move => n p b m ξ []//=.
-      move => + []//=.
-      hauto lq:on ctrs:R.
-    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//= t t0 t1 [h *]. subst.
-      case : t h => // t [*]. subst.
-      spec_refl.
-      move : iha => [a2 [iha ?]]. subst.
-      move : ihb => [b2 [ihb ?]]. subst.
-      move : ihc => [c2 [ihc ?]]. subst.
-      exists (Abs (If a2 (ren_Tm shift b2) (ren_Tm shift c2))).
-      split; last by asimpl.
-      hauto lq:on ctrs:R.
-    - move => n a0 a1 b0 b1 c0 c1 d0 d1 ha iha hb ihb hc ihc hd ihd m ξ []//=.
-      move => a2 b2 c2 [h *]. subst.
-      case : a2 h => //= a3 b3 [*]. subst.
-      spec_refl.
-      hauto lq:on ctrs:R.
     - move => n a b0 b1 c0 c1 hb ihb hc ihc m ξ []//= p0 p1 p2 [h *]. subst.
       spec_refl.
       move : ihb => [b0 [? ?]].
@@ -377,8 +329,6 @@ Module RPar.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | AppBool b a :
-    R (App (BVal b) a) (BVal b)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -386,19 +336,6 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-  | ProjBool p b :
-    R (Proj p (BVal b)) (BVal b)
-  | IfAbs (a0 a1 : Tm (S n)) b0 b1 c0 c1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R (If (Abs a0) b0 c0) (Abs (If a1 (ren_Tm shift b1) (ren_Tm shift c1)))
-  | IfPair a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R d0 d1 ->
-    R (If (Pair a0 b0) c0 d0) (Pair (If a1 c1 d1) (If b1 c1 d1))
   | IfBool a b0 b1 c0 c1 :
     R b0 b1 ->
     R c0 c1 ->
@@ -468,19 +405,11 @@ Module RPar.
   Proof. move => ->. apply IfBool. Qed.
 
 
-  Lemma IfAbs' n (a0 a1  : Tm (S n)) (b0 b1 c0 c1 : Tm n)  u :
-    u = (Abs (If a1 (ren_Tm shift b1) (ren_Tm shift c1))) ->
-    @R (S n) a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R (If (Abs a0) b0 c0) u.
-  Proof. move => ->. apply IfAbs. Qed.
-
   Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
     R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
   Proof.
     move => h. move : m ξ.
-    elim : n a b /h; try solve [(move => *; apply : AppAbs'; eauto; by asimpl) | (move => *; apply : IfAbs'; eauto; by asimpl)].
+    elim : n a b /h; try solve [(move => *; apply : AppAbs'; eauto; by asimpl)].
     all : try qauto ctrs:R use:ProjPair', IfBool'.
   Qed.
 
@@ -510,14 +439,8 @@ Module RPar.
       apply : AppAbs'; eauto using morphing_up.
       by asimpl.
     - hauto lq:on ctrs:R.
-    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:ProjPair' use:morphing_up.
-    - sfirstorder.
-    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ0 ρ1 hρ /=.
-      apply : IfAbs'; eauto using morphing_up.
-      by asimpl.
-    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:IfBool' use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:morphing_up.
@@ -603,9 +526,6 @@ Module RPar.
       eexists. split.
       apply AppPair; hauto. subst.
       by asimpl.
-    - move => n b a m ρ hρ []//=; first by antiimp.
-      case => //=; first by antiimp.
-      hauto lq:on ctrs:R.
     - move => n p a0 a1 ha iha m ρ hρ []//=;
                first by antiimp.
       move => p0 []//= t [*]; first by antiimp. subst.
@@ -623,31 +543,6 @@ Module RPar.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
-    - move => n p b m ρ hρ []//=; first by antiimp.
-      move => p0 + []//=. case => //=; first by antiimp.
-      hauto lq:on ctrs:R.
-    - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ hρ []//=; first by antiimp.
-      move => + b2 c2 [+ *]. subst. case => //=; first by antiimp.
-      move => a [*]. subst.
-      have /var_or_bot_up hρ' := hρ.
-      move : iha hρ' => /[apply] iha.
-      move : ihb (hρ) => /[apply] ihb.
-      move : ihc hρ => /[apply] ihc.
-      spec_refl.
-      move : iha => [a0 [ha0 ?]]. subst.
-      move : ihb => [b0 [hb0 ?]]. subst.
-      move : ihc => [c0 [hc0 ?]]. subst.
-      exists (Abs (If a0 (ren_Tm shift b0) (ren_Tm shift c0))). split.
-      hauto lq:on ctrs:R.
-      by asimpl.
-    - move => n a0 a1 b0 b1 c0 c1 d0 d1 ha iha hb ihb hc ihc hd ihd m ρ hρ []//=; first by antiimp.
-      move => a2 b2 c2 [+ *]. subst. case : a2 => //=; first by antiimp.
-      move => a3 b3 [*]. subst.
-      have {}/iha := (hρ) => iha.
-      have {}/ihb := (hρ) => ihb.
-      have {}/ihc := (hρ) => ihc.
-      spec_refl.
-      hauto lq:on ctrs:R.
     - move => n a b0 b1 c0 c1 hb ihb hc ihc m ρ hρ []//=; first by antiimp.
       move => t t0 t1 [h *]. subst.
       case : t h => //=; first by antiimp.
@@ -1528,7 +1423,6 @@ Proof.
       split.
       hauto lq:on use:relations.rtc_transitive, RPars.AppCong.
       apply EPar.PairCong; by apply EPar.AppCong.
-    + admit.
     + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
   - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
   - move => n p a b0 h0 ih0 b1.
@@ -1543,7 +1437,6 @@ Proof.
       move /Pair_EPar : ih1 => [/(_ p)[d [ihd ihd']] _].
       exists d. split => //.
       hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
-    + admit.
     + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
   - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.BindCong.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
@@ -1552,10 +1445,9 @@ Proof.
   - hauto l:on ctrs:EPar.R inv:RPar.R.
   - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc u.
     elim /RPar.inv => //= _.
-    + admit.
-    + admit.
-    + admit.
     + (* Need the rule that if commutes with abs *)
+      move => a2 b2 b3 c2 c3 hb0 hbc [*]. subst.
+
       admit.
 Admitted.
 
