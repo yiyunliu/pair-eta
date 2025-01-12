@@ -8,6 +8,9 @@ Require Import Psatz.
 From stdpp Require Import relations (rtc (..), rtc_once, rtc_r).
 From Hammer Require Import Tactics.
 Require Import Autosubst2.core Autosubst2.fintype Autosubst2.syntax.
+Import Relation_Operators (clos_refl(..)).
+Arguments clos_refl {A}.
+
 
 Ltac2 spec_refl () :=
   List.iter
@@ -370,6 +373,72 @@ Definition var_or_bot {n} (a : Tm n) :=
   | Bot => true
   | _ => false
   end.
+
+(* *********** Commutativity rules only ********************** *)
+Module CRed.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (****************** Eta ***********************)
+  | IfApp a b c d :
+    R (If (App a b) c d) (App (If a c d) b)
+  | IfProj p a b c :
+    R (If (Proj p a) b c) (Proj p (If a b c))
+
+  (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
+  | AppCong0 a0 a1 b :
+    R a0 a1 ->
+    R (App a0 b) (App a1 b)
+  | AppCong1 a b0 b1 :
+    R b0 b1 ->
+    R (App a b0) (App a b1)
+  | PairCong0 a0 a1 b :
+    R a0 a1 ->
+    R (Pair a0 b) (Pair a1 b)
+  | PairCong1 a b0 b1 :
+    R b0 b1 ->
+    R (Pair a b0) (Pair a b1)
+  | ProjCong p a0 a1 :
+    R a0 a1 ->
+    R (Proj p a0) (Proj p a1)
+  | BindCong0 p A0 A1 B:
+    R A0 A1 ->
+    R (TBind p A0 B) (TBind p A1 B)
+  | BindCong1 p A B0 B1:
+    R B0 B1 ->
+    R (TBind p A B0) (TBind p A B1).
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+  Lemma diamond n (a b c : Tm n) : R a b -> R a c -> exists d, clos_refl R b d /\ clos_refl R c d.
+  Proof.
+    move => h. move : c. elim : n a b /h.
+    - hauto l:on ctrs:R inv:R.
+    - hauto l:on ctrs:R inv:R.
+    - move => n a0 a1 ha iha c.
+      elim /inv => //= _.
+      move => a2 a3 ha' [*]. subst.
+      apply iha in ha'.
+      move : ha' => [d [h0 h1]].
+      exists (Abs d).
+      hauto q:on ctrs:clos_refl,R inv:clos_refl.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - hauto q:on ctrs:clos_refl,R inv:clos_refl, R.
+    - move => n p A B0 B1 hB ihB C.
+      elim /inv => //= _.
+      move => p0 A0 A1 B hA [*]. subst.
+      + hauto lq:on ctrs:clos_refl,R inv:clos_refl.
+      + move => p0 A0 B2 B3 h [*]. subst.
+        move /ihB : h{ihB}.
+        move => [B4 [h0 h1]].
+        exists (TBind p A B4). qauto l:on ctrs:clos_refl, R inv:clos_refl.
+  Qed.
+End CRed.
 
 (***************** Beta rules only ***********************)
 Module RPar.
