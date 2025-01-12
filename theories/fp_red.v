@@ -100,7 +100,18 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R c0 c1 ->
-    R (If a0 b0 c0) (If a1 b1 c1).
+    R (If a0 b0 c0) (If a1 b1 c1)
+  | IfApp a0 a1 b0 b1 c0 c1 d0 d1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R d0 d1 ->
+    R (If (App a0 b0) c0 d0) (App (If a1 c1 d1) b1)
+  | IfProj p a0 a1 b0 b1 c0 c1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (Proj p a0) b0 c0) (Proj p (If a1 b1 c1)).
 
   Lemma refl n (a : Tm n) : R a a.
     elim : n /a; hauto ctrs:R.
@@ -187,6 +198,8 @@ Module Par.
     - sfirstorder.
     - sfirstorder.
     - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
+    - qauto l:on ctrs:R.
   Qed.
 
   Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
@@ -296,6 +309,11 @@ Module Par.
     - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//= t t0 t1[*]. subst.
       spec_refl.
       qauto l:on ctrs:R.
+    - move => n a0 a1 b0 b1 c0 c1 d0 d1 ha iha hb ihb hc ihc hd ihd m ξ []//= t0 t1 t2 [h *]. subst.
+      case : t0 h => //= t t0 [*]. subst.
+      qauto l:on ctrs:R.
+    - move => n p a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//= t0 t1 t [h *]. subst.
+      case : t0 h => //=. qauto l:on ctrs:R.
   Qed.
 
 End Par.
