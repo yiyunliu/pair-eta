@@ -33,8 +33,6 @@ Module Par.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | AppBool b a :
-    R (App (BVal b) a) (BVal b)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -42,8 +40,6 @@ Module Par.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-  | ProjBool p b :
-    R (Proj p (BVal b)) (BVal b)
   | IfAbs (a0 a1 : Tm (S n)) b0 b1 c0 c1 :
     R a0 a1 ->
     R b0 b1 ->
@@ -175,10 +171,8 @@ Module Par.
       by asimpl.
       hauto l:on use:renaming inv:option.
     - hauto lq:on rew:off ctrs:R.
-    - hauto lq:on rew:off ctrs:R.
     - hauto l:on inv:option use:renaming ctrs:R.
     - hauto lq:on use:ProjPair'.
-    - hauto lq:on rew:off ctrs:R.
     - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ0 ρ1 hρ /=.
       eapply IfAbs' with (a1 := (subst_Tm (up_Tm_Tm ρ1) a1)); eauto. by asimpl.
       hauto l:on use:renaming inv:option.
@@ -230,8 +224,6 @@ Module Par.
       eexists. split.
       apply AppPair; hauto. subst.
       by asimpl.
-    - move => n b a m ξ []//=.
-      hauto q:on ctrs:R inv:Tm.
     - move => n p a0 a1 ha iha m ξ []//= p0 []//= t [*]. subst.
       spec_refl. move : iha => [b0 [? ?]]. subst.
       eexists. split. apply ProjAbs; eauto. by asimpl.
@@ -241,9 +233,6 @@ Module Par.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
-    - move => n p b m ξ []//=.
-      move => + []//=.
-      hauto lq:on ctrs:R.
     - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ξ []//= t t0 t1 [h *]. subst.
       case : t h => // t [*]. subst.
       spec_refl.
@@ -395,8 +384,6 @@ Module RPar.
     R b0 b1 ->
     R c0 c1 ->
     R (App (Pair a0 b0) c0) (Pair (App a1 c1) (App b1 c1))
-  | AppBool b a :
-    R (App (BVal b) a) (BVal b)
   | ProjAbs p a0 a1 :
     R a0 a1 ->
     R (Proj p (Abs a0)) (Abs (Proj p a1))
@@ -404,8 +391,6 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R (Proj p (Pair a0 b0)) (if p is PL then a1 else b1)
-  | ProjBool p b :
-    R (Proj p (BVal b)) (BVal b)
   | IfAbs (a0 a1 : Tm (S n)) b0 b1 c0 c1 :
     R a0 a1 ->
     R b0 b1 ->
@@ -455,7 +440,18 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R c0 c1 ->
-    R (If a0 b0 c0) (If a1 b1 c1).
+    R (If a0 b0 c0) (If a1 b1 c1)
+  | IfApp a0 a1 b0 b1 c0 c1 d0 d1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R d0 d1 ->
+    R (If (App a0 b0) c0 d0) (App (If a1 c1 d1) b1)
+  | IfProj p a0 a1 b0 b1 c0 c1 :
+    R a0 a1 ->
+    R b0 b1 ->
+    R c0 c1 ->
+    R (If (Proj p a0) b0 c0) (Proj p (If a1 b1 c1)).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -528,10 +524,8 @@ Module RPar.
       apply : AppAbs'; eauto using morphing_up.
       by asimpl.
     - hauto lq:on ctrs:R.
-    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
     - hauto lq:on ctrs:R use:ProjPair' use:morphing_up.
-    - sfirstorder.
     - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ0 ρ1 hρ /=.
       apply : IfAbs'; eauto using morphing_up.
       by asimpl.
@@ -543,6 +537,8 @@ Module RPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
+    - hauto lq:on ctrs:R.
+    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
@@ -621,9 +617,6 @@ Module RPar.
       eexists. split.
       apply AppPair; hauto. subst.
       by asimpl.
-    - move => n b a m ρ hρ []//=; first by antiimp.
-      case => //=; first by antiimp.
-      hauto lq:on ctrs:R.
     - move => n p a0 a1 ha iha m ρ hρ []//=;
                first by antiimp.
       move => p0 []//= t [*]; first by antiimp. subst.
@@ -641,9 +634,6 @@ Module RPar.
       move : ihb => [c0 [? ?]]. subst.
       eexists. split. by eauto using ProjPair.
       hauto q:on.
-    - move => n p b m ρ hρ []//=; first by antiimp.
-      move => p0 + []//=. case => //=; first by antiimp.
-      hauto lq:on ctrs:R.
     - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc m ρ hρ []//=; first by antiimp.
       move => + b2 c2 [+ *]. subst. case => //=; first by antiimp.
       move => a [*]. subst.
@@ -734,7 +724,57 @@ Module RPar.
       have {}/ihc := (hρ) => ihc.
       spec_refl.
       hauto lq:on ctrs:R.
+  Admitted.
+
+  Function tstar {n} (a : Tm n) :=
+    match a with
+    | VarTm i => a
+    | Abs a => Abs (tstar a)
+    | App a b => match tstar a with
+                | Abs a => subst_Tm (scons (tstar b) VarTm) a
+                | Pair a c => Pair (App a (tstar b)) (App c (tstar b))
+                | _ => App (tstar a) (tstar b)
+                end
+    | Pair a b => Pair (tstar a) (tstar b)
+    | Proj p a => match tstar a with
+                 | Pair a b => if p is PL then a else b
+                 | Abs a => Abs (Proj p a)
+                 | _ => Proj p (tstar a)
+                 end
+    | TBind p a b => TBind p (tstar a) (tstar b)
+    | Bot => Bot
+    | Univ i => Univ i
+    | Bool => Bool
+    | BVal b => BVal b
+    | If a b c => match tstar a with
+                 | BVal v => if v then (tstar b) else (tstar c)
+                 | Abs a => Abs (If a (ren_Tm shift (tstar b)) (ren_Tm shift (tstar c)))
+                 | Pair a0 a1 => Pair (If a0 (tstar b) (tstar c)) (If a1 (tstar b) (tstar c))
+                 | Proj p a => Proj p (If a (tstar b) (tstar c))
+                 | App a0 a1 => App (If a0 (tstar b) (tstar c)) a1
+                 | _ => If (tstar a) (tstar b) (tstar c)
+                 end
+    end.
+
+  Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
+  Proof.
+    apply tstar_ind => {n a}.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on use:RPar.cong, RPar.refl ctrs:RPar.R inv:RPar.R.
+    - hauto lq:on rew:off ctrs:RPar.R inv:RPar.R.
+    - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
+    - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+    - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on inv:RPar.R ctrs:RPar.R.
   Qed.
+
+
 End RPar.
 
 (* (***************** Beta rules only ***********************) *)
@@ -1797,41 +1837,6 @@ Proof.
   - admit.
   - admit.
 Admitted.
-
-Function tstar {n} (a : Tm n) :=
-  match a with
-  | VarTm i => a
-  | Abs a => Abs (tstar a)
-  | App (Abs a) b => subst_Tm (scons (tstar b) VarTm) (tstar a)
-  | App (Pair a b) c =>
-      Pair (App (tstar a) (tstar c)) (App (tstar b) (tstar c))
-  | App a b => App (tstar a) (tstar b)
-  | Pair a b => Pair (tstar a) (tstar b)
-  | Proj p (Pair a b) => if p is PL then (tstar a) else (tstar b)
-  | Proj p (Abs a) => (Abs (Proj p (tstar a)))
-  | Proj p a => Proj p (tstar a)
-  | TBind p a b => TBind p (tstar a) (tstar b)
-  | Bot => Bot
-  | Univ i => Univ i
-  end.
-
-Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
-Proof.
-  apply tstar_ind => {n a}.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on use:RPar.cong, RPar.refl ctrs:RPar.R inv:RPar.R.
-  - hauto lq:on rew:off ctrs:RPar.R inv:RPar.R.
-  - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on rew:off inv:RPar.R ctrs:RPar.R.
-  - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
-  - hauto drew:off inv:RPar.R use:RPar.refl, RPar.ProjPair'.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-  - hauto lq:on inv:RPar.R ctrs:RPar.R.
-Qed.
 
 Function tstar' {n} (a : Tm n) :=
   match a with
