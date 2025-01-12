@@ -832,6 +832,55 @@ Module RPar.
 
 End RPar.
 
+
+Module RRed.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (****************** Beta ***********************)
+  | AppAbs a b :
+    R (App (Abs a) b)  (subst_Tm (scons b VarTm) a)
+  | AppPair a b c:
+    R (App (Pair a b) c) (Pair (App a c) (App b c))
+  | ProjAbs p a :
+    R (Proj p (Abs a)) (Abs (Proj p a))
+  | ProjPair p a b :
+    R (Proj p (Pair a b)) (if p is PL then a else b)
+  | IfAbs (a : Tm (S n)) b c :
+    R (If (Abs a) b c) (Abs (If a (ren_Tm shift b) (ren_Tm shift c)))
+  | IfPair a b c d :
+    R (If (Pair a b) c d) (Pair (If a c d) (If b c d))
+  | IfBool a b c :
+    R (If (BVal a) b c) (if a then b else c)
+
+  (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
+  | AppCong0 a0 a1 b :
+    R a0 a1 ->
+    R (App a0 b) (App a1 b)
+  | AppCong1 a b0 b1 :
+    R b0 b1 ->
+    R (App a b0) (App a b1)
+  | PairCong0 a0 a1 b :
+    R a0 a1 ->
+    R (Pair a0 b) (Pair a1 b)
+  | PairCong1 a b0 b1 :
+    R b0 b1 ->
+    R (Pair a b0) (Pair a b1)
+  | ProjCong p a0 a1 :
+    R a0 a1 ->
+    R (Proj p a0) (Proj p a1)
+  | BindCong0 p A0 A1 B:
+    R A0 A1 ->
+    R (TBind p A0 B) (TBind p A1 B)
+  | BindCong1 p A B0 B1:
+    R B0 B1 ->
+    R (TBind p A B0) (TBind p A B1).
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
+End RRed.
+
 (* (***************** Beta rules only ***********************) *)
 (* Module RPar'. *)
 (*   Inductive R {n} : Tm n -> Tm n ->  Prop := *)
