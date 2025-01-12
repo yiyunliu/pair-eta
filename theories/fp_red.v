@@ -439,17 +439,16 @@ Module RPar.
     R b0 b1 ->
     R c0 c1 ->
     R (If a0 b0 c0) (If a1 b1 c1)
-  | IfApp a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
+  | IfApp q a b c0 c1 d0 d1 :
+    R q (App a b) ->
     R c0 c1 ->
     R d0 d1 ->
-    R (If (App a0 b0) c0 d0) (App (If a1 c1 d1) b1)
+    R (If q c0 d0) (App (If a c1 d1) b)
   | IfProj p a0 a1 b0 b1 c0 c1 :
-    R a0 a1 ->
+    R a0 (Proj p a1) ->
     R b0 b1 ->
     R c0 c1 ->
-    R (If (Proj p a0) b0 c0) (Proj p (If a1 b1 c1)).
+    R (If a0 b0 c0) (Proj p (If a1 b1 c1)).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -826,8 +825,21 @@ Module RPar.
         hauto q:on.
         sfirstorder use:refl.
         sfirstorder.
-      + move => a1 a2 b1 b2 c0 c1 d0 d1 ha hb hc hd [*]. subst.
-        have {}/ih : R (App a1 b1) (App a2 b2) by eauto using AppCong.
+      + move => q a1 b1 c0 c1 d0 d1 ha hb hc[*]. subst.
+        apply ih in ha.
+        apply hh in hb.
+        have : R d1 d1 by eauto using refl.
+        rewrite eq in ha. move : ha hb hc. clear => ha hb hc hd.
+        elim /inv : ha => //= _.
+        move => a0 a2 b0 b2 ha0 hb0 [? ?] eq. subst.
+        apply : AppAbs'; eauto; cycle 1.
+        apply IfAbs;  eauto.
+        asimpl. rewrite eq.
+
+        asimpl.
+        rewrite eq.
+
+
         rewrite eq.
         elim /inv => //= _.
         move => a0 a3 b0 b3 ha0 hb0 [*]. subst.
