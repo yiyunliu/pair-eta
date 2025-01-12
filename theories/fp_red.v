@@ -509,18 +509,7 @@ Module RPar.
     R a0 a1 ->
     R b0 b1 ->
     R c0 c1 ->
-    R (If a0 b0 c0) (If a1 b1 c1)
-  | IfApp a0 a1 b0 b1 c0 c1 d0 d1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R d0 d1 ->
-    R (If (App a0 b0) c0 d0) (App (If a1 c1 d1) b1)
-  | IfProj p a0 a1 b0 b1 c0 c1 :
-    R a0 a1 ->
-    R b0 b1 ->
-    R c0 c1 ->
-    R (If (Proj p a0) b0 c0) (Proj p (If a1 b1 c1)).
+    R (If a0 b0 c0) (If a1 b1 c1).
 
   Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
 
@@ -606,8 +595,6 @@ Module RPar.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R use:morphing_up.
-    - hauto lq:on ctrs:R.
-    - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
     - hauto lq:on ctrs:R.
@@ -793,36 +780,29 @@ Module RPar.
       have {}/ihc := (hρ) => ihc.
       spec_refl.
       hauto lq:on ctrs:R.
-  Admitted.
+  Qed.
 
   Function tstar {n} (a : Tm n) :=
     match a with
     | VarTm i => a
     | Abs a => Abs (tstar a)
-    | App a b => match tstar a with
-                | Abs a => subst_Tm (scons (tstar b) VarTm) a
-                | Pair a c => Pair (App a (tstar b)) (App c (tstar b))
-                | _ => App (tstar a) (tstar b)
-                end
+    | App (Abs a) b => subst_Tm (scons (tstar b) VarTm) (tstar a)
+    | App (Pair a b) c =>
+        Pair (App (tstar a) (tstar c)) (App (tstar b) (tstar c))
+    | App a b => App (tstar a) (tstar b)
     | Pair a b => Pair (tstar a) (tstar b)
-    | Proj p a => match tstar a with
-                 | Pair a b => if p is PL then a else b
-                 | Abs a => Abs (Proj p a)
-                 | _ => Proj p (tstar a)
-                 end
+    | Proj p (Pair a b) => if p is PL then (tstar a) else (tstar b)
+    | Proj p (Abs a) => (Abs (Proj p (tstar a)))
+    | Proj p a => Proj p (tstar a)
     | TBind p a b => TBind p (tstar a) (tstar b)
     | Bot => Bot
     | Univ i => Univ i
     | Bool => Bool
-    | BVal b => BVal b
-    | If a b c => match tstar a with
-                 | BVal v => if v then (tstar b) else (tstar c)
-                 | Abs a => Abs (If a (ren_Tm shift (tstar b)) (ren_Tm shift (tstar c)))
-                 | Pair a0 a1 => Pair (If a0 (tstar b) (tstar c)) (If a1 (tstar b) (tstar c))
-                 | Proj p a => Proj p (If a (tstar b) (tstar c))
-                 | App a0 a1 => App (If a0 (tstar b) (tstar c)) a1
-                 | _ => If (tstar a) (tstar b) (tstar c)
-                 end
+    | If (BVal v) b c => if v then (tstar b) else (tstar c)
+    | If (Abs a) b c => Abs (If (tstar a) (ren_Tm shift (tstar b)) (ren_Tm shift (tstar c)))
+    | If (Pair a0 a1) b c => Pair (If (tstar a0) (tstar b) (tstar c)) (If (tstar a1) (tstar b) (tstar c))
+    | If a b c => If (tstar a) (tstar b) (tstar c)
+    | BVal v => BVal v
     end.
 
   Lemma RPar_triangle n (a : Tm n) : forall b, RPar.R a b -> RPar.R b (tstar a).
@@ -841,8 +821,14 @@ Module RPar.
     - hauto lq:on inv:RPar.R ctrs:RPar.R.
     - hauto lq:on inv:RPar.R ctrs:RPar.R.
     - hauto lq:on inv:RPar.R ctrs:RPar.R.
+    - hauto lq:on ctrs:R inv:R.
+    - qauto l:on use:refl, IfBool' inv:R.
+    - hauto drew:off use:refl, IfBool' inv:R.
+    - hauto lq:on ctrs:RPar.R inv:RPar.R use:renaming.
+    - hauto lq:on drew:off ctrs:R inv:R.
+    - hauto lq:on drew:off ctrs:R inv:R.
+    - hauto lq:on drew:off ctrs:R inv:R.
   Qed.
-
 
 End RPar.
 
