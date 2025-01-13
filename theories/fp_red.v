@@ -428,6 +428,34 @@ Module CRed.
   Lemma refl n (a : Tm n) : R a a.
   Proof. elim : n / a; hauto lq:on ctrs:R. Qed.
 
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h; hauto lq:on ctrs:R.
+  Qed.
+
+  Lemma morphing n m (a b : Tm n) (ρ0 ρ1 : fin n -> Tm m) :
+    (forall i, R (ρ0 i) (ρ1 i)) ->
+    R a b -> R (subst_Tm ρ0 a) (subst_Tm ρ1 b).
+  Proof.
+    move => + h. move : m ρ0 ρ1. elim : a b /h; hauto l:on ctrs:R inv:option use:renaming.
+  Qed.
+
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    R a b ->
+    R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. hauto l:on use:morphing, refl. Qed.
+
+  Lemma cong n (a b : Tm (S n)) c d :
+    R a b ->
+    R c d ->
+    R (subst_Tm (scons c VarTm) a) (subst_Tm (scons d VarTm) b).
+  Proof.
+    move => h0 h1. apply morphing => //=.
+    qauto l:on ctrs:R inv:option.
+  Qed.
+
   Function tstar {n} (a : Tm n) :=
     match a with
     | VarTm i => a
@@ -908,40 +936,139 @@ Module RRed.
 
 End RRed.
 
+Module RReds.
+
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:RRed.R.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc RRed.R a b ->
+    rtc RRed.R (Abs a) (Abs b).
+  Proof. solve_s. Qed.
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc RRed.R a0 a1 ->
+    rtc RRed.R b0 b1 ->
+    rtc RRed.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1 :
+    rtc RRed.R a0 a1 ->
+    rtc RRed.R b0 b1 ->
+    rtc RRed.R (TBind p a0 b0) (TBind p a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc RRed.R a0 a1 ->
+    rtc RRed.R b0 b1 ->
+    rtc RRed.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma ProjCong n p (a0 a1  : Tm n) :
+    rtc RRed.R a0 a1 ->
+    rtc RRed.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+End RReds.
+
+
 Module CRedRRed.
   Lemma commutativity0 n (a b0 b1 : Tm n) :
-    CRed.R a b0 -> RRed.R a b1 -> exists c, rtc RRed.R b0 c /\ clos_refl CRed.R b1 c.
+    CRed.R a b0 -> RRed.R a b1 -> exists c, rtc RRed.R b0 c /\ CRed.R b1 c.
   Proof.
     move => h. move : b1. elim : n a b0/h => n.
     - hauto lq:on inv:RRed.R.
     - hauto q:on inv:RRed.R.
+    - hauto q:on inv:RRed.R.
     - move => a0 a1 ha iha b.
       elim /RRed.inv => //=_ a2 a3 h [*]. subst.
       move /iha : h => [a [h0 h1]].
-      exists (Abs a). split. admit. hauto lq:on ctrs:clos_refl, CRed.R inv:clos_refl.
-    - move => a0 a1 b ha iha b1.
+      exists (Abs a). split. auto using RReds.AbsCong. hauto lq:on ctrs:CRed.R.
+    - move => a0 a1 b0 b1 ha iha hb ihb u.
       elim /RRed.inv => //=_.
-      + move => a2 b0 [*]. subst.
+      + move => a2 b2 [*]. subst.
         elim /CRed.inv : ha => //= _ a0 a3 ha [*]. subst.
-        exists (subst_Tm (scons b VarTm) a3).
+        move {iha ihb}.
+        exists (subst_Tm (scons b1 VarTm) a3).
         split. hauto lq:on ctrs:RRed.R use:@rtc_once.
-        apply r_step.
-        admit.
+        hauto lq:on use:CRed.cong.
       + sauto lq:on.
-      + move => a2 a3 b0 ha0 [*]. subst.
+      + move => a2 a3 b2 ha0 [*]. subst.
         move /iha : ha0 => [a4 [h0 h1]].
-        exists (App a4 b).
-        split. admit.
+        exists (App a4 b1).
+        split. hauto lq:on ctrs:rtc use: RReds.AppCong.
         sauto lq:on rew:off.
-      + sauto lq:on.
-    - move => a b0 b1 ha iha b2.
+      + move => a2 b2 b3 hb2 [*]. subst.
+        move /ihb : hb2 => [b4 [ih0 ih1]].
+        exists (App a1 b4).
+        split.
+        hauto lq:on ctrs:rtc use:RReds.AppCong.
+        hauto lq:on ctrs:CRed.R.
+    - move => a0 a1 b0 b1 ha iha hb ihb u.
       elim /RRed.inv => //= _.
-      + move => a0 b3 [*]. subst.
-        exists (subst_Tm (scons b1 VarTm) a0).
+      + move => a2 a3 b2 + [*]. subst.
+        move /iha => [a4 [ih0 ih1]].
+        exists (Pair a4 b1).
+        split. hauto lq:on ctrs:rtc use:RReds.PairCong.
+        sauto lq:on.
+      + move => a2 b2 b3 + [*]. subst.
+        move /ihb {ihb}.
+        move => [b4 [ih0 ih1]].
+        exists (Pair a1 b4). split. hauto lq:on ctrs:rtc use:RReds.PairCong.
+        sauto lq:on.
+    - move => p a0 a1 ha iha u.
+      elim /RRed.inv => //= _.
+      + sauto lq:on rew:off.
+      + sauto q:on.
+      + move => p0 a2 a3 ha2 [*]. subst.
+        move /iha : ha2 {iha} => [a4 [ih0 ih1]].
+        exists (Proj p a4).
+        split. sfirstorder ctrs:rtc use:RReds.ProjCong.
+        sauto lq:on.
+    - move => p A0 A1 B0 B1 hA ihA hB ihB u.
+      elim /RRed.inv => //=_.
+      + move => p0 A2 A3 B h [*]. subst.
+        apply ihA in h.
+        move : h => [A [h0 h1]].
+        exists (TBind p A B1).
+        split. hauto lq:on use:RReds.BindCong.
+        sauto lq:on.
+      + move => p0 A B2 B3 hB0 [*]. subst.
+        apply ihB in hB0.
+        move : hB0 => [B [ih0 ih1]].
+        exists (TBind p A1 B).
+        split. hauto ctrs:rtc lq:on use:RReds.BindCong.
+        sauto lq:on.
+    - sauto lq:on.
+    - sauto lq:on.
+    - sauto lq:on.
+    - sauto lq:on.
+    - move => a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc u.
+      elim /RRed.inv => //= _.
+      + move => a2 b2 c [*]. subst.
+        elim /CRed.inv : ha => //=_.
+        move => a0 a3 ha [*]. subst.
+        exists (Abs (If a3 (ren_Tm shift b1) (ren_Tm shift c1))).
         split. sauto lq:on.
-
-
-
+        apply CRed.AbsCong.
+        apply CRed.IfCong; eauto using CRed.renaming.
+      + move => a2 b2 c d [*]. subst.
+        move {iha ihb ihc}.
+        elim /CRed.inv : ha => //=_.
+        move => a0 a3 b3 b4 h0 h1 [*]. subst.
+        exists (Pair (If a3 b1 c1) (If b4 b1 c1)).
+        split. sauto lq:on.
+        sauto lq:on.
+      + move {iha ihb ihc}.
+        move => a2 b2 c [*]. subst.
+        elim /CRed.inv : ha => //= _.
+        move => b2 [*]. subst.
+        sauto lq:on.
+  Qed.
+End CRedRRed.
 
 (* (***************** Beta rules only ***********************) *)
 (* Module RPar'. *)
