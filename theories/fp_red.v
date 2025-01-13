@@ -881,6 +881,41 @@ Module RRed.
 
 End RRed.
 
+Module CRedRRed.
+  Lemma commutativity0 n (a b0 b1 : Tm n) :
+    CRed.R a b0 -> RRed.R a b1 -> exists c, rtc RRed.R b0 c /\ clos_refl CRed.R b1 c.
+  Proof.
+    move => h. move : b1. elim : n a b0/h => n.
+    - hauto lq:on inv:RRed.R.
+    - hauto q:on inv:RRed.R.
+    - move => a0 a1 ha iha b.
+      elim /RRed.inv => //=_ a2 a3 h [*]. subst.
+      move /iha : h => [a [h0 h1]].
+      exists (Abs a). split. admit. hauto lq:on ctrs:clos_refl, CRed.R inv:clos_refl.
+    - move => a0 a1 b ha iha b1.
+      elim /RRed.inv => //=_.
+      + move => a2 b0 [*]. subst.
+        elim /CRed.inv : ha => //= _ a0 a3 ha [*]. subst.
+        exists (subst_Tm (scons b VarTm) a3).
+        split. hauto lq:on ctrs:RRed.R use:@rtc_once.
+        apply r_step.
+        admit.
+      + sauto lq:on.
+      + move => a2 a3 b0 ha0 [*]. subst.
+        move /iha : ha0 => [a4 [h0 h1]].
+        exists (App a4 b).
+        split. admit.
+        sauto lq:on rew:off.
+      + sauto lq:on.
+    - move => a b0 b1 ha iha b2.
+      elim /RRed.inv => //= _.
+      + move => a0 b3 [*]. subst.
+        exists (subst_Tm (scons b1 VarTm) a0).
+        split. sauto lq:on.
+
+
+
+
 (* (***************** Beta rules only ***********************) *)
 (* Module RPar'. *)
 (*   Inductive R {n} : Tm n -> Tm n ->  Prop := *)
