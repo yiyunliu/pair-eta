@@ -1151,6 +1151,22 @@ Module CRRed.
       end.
   Qed.
 
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    R a b -> R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof.
+    move => h. move : m ρ.
+    elim : n a b /h => n /=;
+      lazymatch goal with
+      | [|- context[App (Abs _) _]] => move => * /=; apply AppAbs'; by asimpl
+      | [|- context[If (BVal _) _]] => hauto l:on use:IfBool
+      | [|- context[Proj _ (Pair _ _)]] => hauto l:on use:ProjPair
+      | [|- context[If (Abs _) _]] => move => * /=; apply IfAbs'; by asimpl
+      | _ => qauto ctrs:R
+      end.
+  Qed.
+
+  Derive Dependent Inversion inv with (forall n (a b : Tm n), R a b) Sort Prop.
+
 End CRRed.
 
 
@@ -1204,6 +1220,10 @@ Module CRReds.
     move => h. move : m ξ.
     induction h; hauto lq:on ctrs:rtc use:CRRed.renaming.
   Qed.
+
+  Lemma substing n m (a b : Tm n) (ρ : fin n -> Tm m) :
+    rtc CRRed.R a b -> rtc CRRed.R (subst_Tm ρ a) (subst_Tm ρ b).
+  Proof. induction 1; hauto lq:on ctrs:rtc use:CRRed.substing. Qed.
 
 End CRReds.
 
@@ -1963,11 +1983,10 @@ Proof.
   - sauto lq: on.
 Qed.
 
-
 Lemma Pair_EPar n (a b c : Tm n) :
   EPar.R (Pair a b) c ->
-  (forall p, exists d, rtc RPar.R (Proj p c) d /\ EPar.R (if p is PL then a else b) d) /\
-    (exists d0 d1, rtc RPar.R (App (ren_Tm shift c) (VarTm var_zero))
+  (forall p, exists d, rtc CRRed.R (Proj p c) d /\ EPar.R (if p is PL then a else b) d) /\
+    (exists d0 d1, rtc CRRed.R (App (ren_Tm shift c) (VarTm var_zero))
                 (Pair (App (ren_Tm shift d0) (VarTm var_zero))(App (ren_Tm shift d1) (VarTm var_zero))) /\
     EPar.R a d0 /\ EPar.R b d1).
 Proof.
@@ -1981,44 +2000,44 @@ Proof.
       exists (Abs (App (ren_Tm shift (if p is PL then d0 else d1)) (VarTm var_zero))).
       split.
       * apply : relations.rtc_transitive.
-        ** apply RPars.ProjCong. apply RPars.AbsCong. eassumption.
-        ** apply : rtc_l. apply RPar.ProjAbs; eauto using RPar.refl. apply RPars.AbsCong.
-           apply : rtc_l. apply RPar.ProjPair; eauto using RPar.refl.
+        ** apply CRReds.ProjCong. apply CRReds.AbsCong. eassumption.
+        ** apply : rtc_l. apply CRRed.ProjAbs. apply CRReds.AbsCong.
+           apply : rtc_l. apply CRRed.ProjPair.
            hauto l:on.
       * hauto lq:on use:EPar.AppEta'.
     + exists d0, d1.
       repeat split => //.
-      apply : rtc_l. apply : RPar.AppAbs'; eauto using RPar.refl => //=.
+      apply : rtc_l. apply : CRRed.AppAbs' => //=.
       by asimpl; renamify.
   - move => n a0 a1 ha iha a b ?. subst. specialize iha with (1 := eq_refl).
     split => [p|].
     + move : iha => [/(_ p) [d [ih0 ih1]] _].
       exists d. split=>//.
-      apply : rtc_l. apply RPar.ProjPair; eauto using RPar.refl.
-      set q := (X in rtc RPar.R X d).
+      apply : rtc_l. apply CRRed.ProjPair.
+      set q := (X in rtc CRRed.R X d).
       by have -> : q = Proj p a1 by hauto lq:on.
     + move  :iha => [iha _].
       move : (iha PL) => [d0 [ih0 ih0']].
       move : (iha PR) => [d1 [ih1 ih1']] {iha}.
       exists d0, d1.
-      apply RPars.weakening in ih0, ih1.
+      apply CRReds.renaming with (ξ := shift) in ih0, ih1.
       repeat split => //=.
-      apply : rtc_l. apply RPar.AppPair; eauto using RPar.refl.
-      apply RPars.PairCong; apply RPars.AppCong; eauto using rtc_refl.
+      apply : rtc_l. apply CRRed.AppPair.
+      apply CRReds.PairCong; apply CRReds.AppCong; eauto using rtc_refl.
   - move => n a0 a1 b0 b1 ha _ hb _ a b [*]. subst.
     split.
     + move => p.
       exists (if p is PL then a1 else b1).
       split.
-      * apply rtc_once. apply : RPar.ProjPair'; eauto using RPar.refl.
+      * apply rtc_once. apply : CRRed.ProjPair.
       * hauto lq:on rew:off.
     + exists a1, b1.
-      split. apply rtc_once. apply RPar.AppPair; eauto using RPar.refl.
+      split. apply rtc_once. apply CRRed.AppPair.
       split => //.
 Qed.
 
 Lemma commutativity0 n (a b0 b1 : Tm n) :
-  EPar.R a b0 -> RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
+  EPar.R a b0 -> CRRed.R a b1 -> exists c, rtc CRRed.R b0 c /\ EPar.R b1 c.
 Proof.
   move => h. move : b1.
   elim : n a b0 / h.
@@ -2027,85 +2046,91 @@ Proof.
     move => [c [ih0 ih1]].
     exists (Abs (App (ren_Tm shift c) (VarTm var_zero))).
     split.
-    + hauto lq:on ctrs:rtc use:RPars.AbsCong, RPars.AppCong, RPars.renaming.
+    + hauto lq:on ctrs:rtc use:CRReds.AbsCong, CRReds.AppCong, CRReds.renaming.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
   - move => n a b0 hb0 ihb0 b1 /[dup] hb1 {}/ihb0.
     move => [c [ih0 ih1]].
     exists (Pair (Proj PL c) (Proj PR c)). split.
-    + apply RPars.PairCong;
-      by apply RPars.ProjCong.
+    + apply CRReds.PairCong;
+      by apply CRReds.ProjCong.
     + hauto lq:on ctrs:EPar.R use:EPar.refl, EPar.renaming.
-  - hauto l:on ctrs:rtc inv:RPar.R.
+  - hauto l:on ctrs:rtc inv:CRRed.R.
   - move => n a0 a1 h ih b1.
-    elim /RPar.inv => //= _.
+    elim /CRRed.inv => //= _.
     move => a2 a3 ? [*]. subst.
-    hauto lq:on ctrs:rtc, RPar.R, EPar.R use:RPars.AbsCong.
+    hauto lq:on ctrs:rtc, CRRed.R, EPar.R use:CRReds.AbsCong.
   - move => n a0 a1 b0 b1 ha iha hb ihb b2.
-    elim /RPar.inv => //= _.
-    + move =>  a2 a3 b3 b4 h0 h1 [*]. subst.
-      move /(_ _ ltac:(by eauto)) : ihb => [b [ihb0 ihb1]].
-      have {}/iha : RPar.R (Abs a2) (Abs a3) by hauto lq:on ctrs:RPar.R.
-      move => [c [ih0 /Abs_EPar [[d [ih1 ih2]] _]]].
-      exists (subst_Tm (scons b VarTm) d).
+    elim /CRRed.inv => //= _.
+    + move =>  a2 b3  [*]. subst. move {iha ihb}.
+      move /Abs_EPar : ha => [[d [ih1 ih2]] _].
+      exists (subst_Tm (scons b1 VarTm) d).
       split.
       (* By substitution *)
-      * move /RPars.substing  : ih2.
-        move /(_ b).
+      * move /CRReds.substing  : ih2.
+        move /(_ _ (scons b1 VarTm)).
         asimpl.
-        eauto using relations.rtc_transitive, RPars.AppCong.
+        eauto using relations.rtc_transitive, CRReds.AppCong.
       (* By EPar morphing *)
       * by apply EPar.substing.
-    + move => a2 a3 b3 b4 c0 c1 h0 h1 h2 [*]. subst.
-      move /(_ _ ltac:(by eauto using RPar.PairCong)) : iha
-           => [c [ihc0 ihc1]].
-      move /(_ _ ltac:(by eauto)) : ihb => [d [ihd0 ihd1]].
-      move /Pair_EPar  : ihc1 => [_ [d0 [d1 [ih0 [ih1 ih2]]]]].
-      move /RPars.substing : ih0. move /(_ d).
+    + move => a2 b3 c [*]. subst. move {iha ihb}.
+      move /Pair_EPar  : ha => [_ [d0 [d1 [ih0 [ih1 ih2]]]]].
+      move /CRReds.substing : ih0. move /(_ _ (scons b1 VarTm)).
       asimpl => h.
-      exists (Pair (App d0 d) (App d1 d)).
+      exists (Pair (App d0 b1) (App d1 b1)).
       split.
-      hauto lq:on use:relations.rtc_transitive, RPars.AppCong.
+      hauto lq:on use:@relations.rtc_transitive, CRReds.AppCong.
       apply EPar.PairCong; by apply EPar.AppCong.
-    + case : a0 ha iha => //=.
-      move => b ha hc b3 a0 [*]. subst.
-      admit.
-    + hauto lq:on ctrs:EPar.R use:RPars.AppCong.
-  - hauto lq:on ctrs:EPar.R inv:RPar.R use:RPars.PairCong.
+    + hauto lq:on ctrs:EPar.R, rtc use:CRReds.AppCong.
+    + move => a2 b3 b4 + [*]. subst.
+      move /ihb => [b [h0 h1]].
+      exists (App a1 b).
+      hauto q:on ctrs:EPar.R, rtc use:CRReds.AppCong.
+  - hauto lq:on ctrs:EPar.R, rtc inv:CRRed.R use:CRReds.PairCong.
   - move => n p a b0 h0 ih0 b1.
-    elim /RPar.inv => //= _.
-    + move => ? a0 a1 h [*]. subst.
-      move /(_ _ ltac:(by eauto using RPar.AbsCong)) : ih0 => [c [ih0 ih1]].
-      move /Abs_EPar : ih1 => [_ [d [ih1 ih2]]].
+    elim /CRRed.inv => //= _.
+    + move => ? a0 [*]. subst. move {ih0}.
+      move /Abs_EPar : h0 => [_ [d [ih1 ih2]]].
       exists (Abs (Proj p d)).
-      qauto l:on ctrs:EPar.R use:RPars.ProjCong, @relations.rtc_transitive.
-    + move => p0 a0 a1 b2 b3 h1 h2 [*]. subst.
-      move /(_ _ ltac:(by eauto using RPar.PairCong)) : ih0 => [c [ih0 ih1]].
-      move /Pair_EPar : ih1 => [/(_ p)[d [ihd ihd']] _].
+      qauto l:on ctrs:EPar.R use:CRReds.ProjCong, @relations.rtc_transitive.
+    + move => p0 a0 b2 [*]. subst.
+      move /Pair_EPar : h0 => [/(_ p)[d [ihd ihd']] _].
       exists d. split => //.
-      hauto lq:on use:RPars.ProjCong, relations.rtc_transitive.
-    + move => p0 b2 [*]. subst.
-      admit.
-    + hauto lq:on ctrs:EPar.R use:RPars.ProjCong.
-  - hauto lq:on inv:RPar.R ctrs:EPar.R, rtc use:RPars.BindCong.
-  - hauto l:on ctrs:EPar.R inv:RPar.R.
-  - hauto l:on ctrs:EPar.R inv:RPar.R.
-  - hauto l:on ctrs:EPar.R inv:RPar.R.
-  - hauto l:on ctrs:EPar.R inv:RPar.R.
+    + hauto lq:on ctrs:EPar.R, rtc use:CRReds.ProjCong.
+  - hauto lq:on inv:CRRed.R ctrs:EPar.R, rtc use:CRReds.BindCong.
+  - hauto l:on ctrs:EPar.R inv:CRRed.R.
+  - hauto l:on ctrs:EPar.R inv:CRRed.R.
+  - hauto l:on ctrs:EPar.R inv:CRRed.R.
+  - hauto l:on ctrs:EPar.R inv:CRRed.R.
   - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc u.
-    elim /RPar.inv => //= _.
-    + move => a2 a3 b2 b3 c2 c3 ha2 hb2 hc2 [*]. subst.
-      move /(_ _ ltac:(by eauto using RPar.AbsCong)) : iha => [c [ih0 ih1]].
-      move /Abs_EPar : ih1 => [[d [ih2 ih3]]  _].
-      have {}/ihb := hb2. move => [b4 [ihb0 ihb1]].
-      have {}/ihc := hc2. move => [c4 [ihc0 ihc1]].
-
-      exists (Abs (If d (ren_Tm shift b4) (ren_Tm shift c4))).
-      split. admit.
+    elim /CRRed.inv => //= _.
+    + move => a2 b2 c [*]{iha ihb ihc}. subst.
+      move /Abs_EPar_If : ha => [d [h0 h1]].
+      move /(_ b1 c1) : h1 => [e [h1 h2]].
+      exists e. split => //.
+      apply : OExp.merge; eauto.
       hauto lq:on ctrs:EPar.R use:EPar.renaming.
-    + admit.
-    + admit.
+    + move => a2 b2 c d [*]. subst.
+      admit.
+    + move => a2 b2 c [*]. subst.
+      admit.
     + (* Need the rule that if commutes with abs *)
       admit.
+    + move => p a2 b2 c [*]. subst.
+      move {iha ihb ihc}.
+      admit.
+    + move => a2 a3 b2 c h [*]. subst.
+      move /iha : h {iha} => [a [ha0 ha1]].
+      exists (If a b1 c1). split.
+      hauto lq:on ctrs:rtc use:CRReds.IfCong.
+      hauto lq:on ctrs:EPar.R.
+    + move => a2 b2 b3 c + [*]. subst.
+      move /ihb => [b [? ?]].
+      exists (If a1 b c1).
+      hauto lq:on ctrs:rtc,EPar.R use:CRReds.IfCong.
+    + move => a2 b2 c2 c3 + [*]. subst.
+      move /ihc => {ihc} [c [? ?]].
+      exists (If a1 b1 c).
+      hauto lq:on ctrs:rtc,EPar.R use:CRReds.IfCong.
 Admitted.
 
 Lemma commutativity1 n (a b0 b1 : Tm n) :
