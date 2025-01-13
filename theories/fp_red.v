@@ -1936,6 +1936,80 @@ Proof.
       apply rtc_once. apply : CRRed.ProjAbs.
 Qed.
 
+Lemma Proj_EPar_If n p (a : Tm n) q :
+  EPar.R (Proj p a) q ->
+  exists d, EPar.R a d /\
+         forall b c, exists e, rtc CRRed.R (If q b c) e /\ rtc OExp.R (Proj p (If d b c)) e.
+Proof.
+  move E :(Proj p a) => u h. move : p a E.
+  elim : n u q /h => //=.
+  - move => n a0 a1 ha iha p a ?. subst.
+    spec_refl.
+    move : iha => [d [ih0 ih1]].
+    exists d. split => // b c.
+    move /(_ b c) : ih1 => [e [ih1 ih2]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.AppEta.
+    apply : rtc_l.
+    apply CRRed.IfAbs.
+    apply : rtc_l.
+    apply CRRed.AbsCong.
+    apply CRRed.IfApp.
+    apply CRReds.AbsCong.
+    apply CRReds.AppCong; eauto using rtc_refl.
+    set (x := If _ _ _).
+    change x with (ren_Tm shift (If a1 b c)).
+    eauto using CRReds.renaming.
+  - move => n a0 a1 ha ih p a ?. subst.
+    spec_refl. move : ih => [d [ih0 ih1]].
+    exists d. split => // b c.
+    move /(_ b c) : ih1 => [e [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.PairEta.
+    apply : rtc_l.
+    apply CRRed.IfPair.
+    apply CRReds.PairCong; hauto lq:on ctrs:rtc use:CRRed.IfProj, CRReds.ProjCong.
+  - sauto lq:on rew:off.
+Qed.
+
+Lemma Pair_EPar_If n (r0 r1 : Tm n) q :
+  EPar.R (Pair r0 r1) q ->
+  exists d0 d1, EPar.R r0 d0 /\ EPar.R r1 d1 /\
+             forall b c, exists e, rtc CRRed.R (If q b c) e /\ rtc OExp.R (Pair (If d0 b c) (If d1 b c)) e.
+Proof.
+  move E : (Pair r0 r1) => u h.
+  move : r0 r1 E.
+  elim : n u q /h => //= n.
+  - move => a0 a1 ha iha r0 r1 ?. subst.
+    spec_refl.
+    move : iha => [d0 [d1 [ih0 [ih1 ih2]]]].
+    exists d0, d1. repeat split => //.
+    move => b c.
+    move /(_ b c) : ih2 => [e [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.AppEta.
+    apply : rtc_l. apply CRRed.IfAbs.
+    apply CRReds.AbsCong.
+    apply : rtc_l. apply CRRed.IfApp.
+    apply CRReds.AppCong; auto using rtc_refl.
+    set (x := If _ _ _).
+    change x with (ren_Tm shift (If a1 b c)).
+    auto using CRReds.renaming.
+  - move => a0 a1 ha iha r0 r1 ?. subst.
+    spec_refl. move : iha => [d0 [d1 [ih0 [ih1 ih2]]]].
+    exists d0, d1. (repeat split) => // b c.
+    move /(_ b c) : ih2 => [d [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.PairEta.
+    apply : rtc_l. apply CRRed.IfPair.
+    hauto lq:on ctrs:rtc use:CRRed.IfProj, CRReds.ProjCong, CRReds.PairCong.
+  - sauto lq:on.
+Qed.
+
 Lemma Abs_EPar_If n (a : Tm (S n)) q :
   EPar.R (Abs a) q ->
   exists d, EPar.R a d /\
@@ -2110,14 +2184,20 @@ Proof.
       apply : OExp.merge; eauto.
       hauto lq:on ctrs:EPar.R use:EPar.renaming.
     + move => a2 b2 c d [*]. subst.
-      admit.
-    + move => a2 b2 c [*]. subst.
+      move {iha ihb ihc}.
+      move /Pair_EPar_If : ha => [r0 [r1 [h0 [h1 h2]]]].
+      move /(_ b1 c1) : h2 => [e [h3 h4]].
+      exists e. split => //.
+      hauto lq:on ctrs:EPar.R use:EPar.renaming, OExp.merge.
+    + move => a2 b2 c [*] {iha ihb ihc}. subst.
       admit.
     + (* Need the rule that if commutes with abs *)
+      move => a2 b2 c d [*]. subst.
       admit.
     + move => p a2 b2 c [*]. subst.
       move {iha ihb ihc}.
-      admit.
+      move /Proj_EPar_If : ha => [d [h0 /(_ b1 c1) [e [h1 h2]]]].
+      hauto lq:on ctrs:EPar.R use:EPar.renaming, OExp.merge.
     + move => a2 a3 b2 c h [*]. subst.
       move /iha : h {iha} => [a [ha0 ha1]].
       exists (If a b1 c1). split.
