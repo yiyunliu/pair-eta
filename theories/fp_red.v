@@ -1070,6 +1070,144 @@ Module CRedRRed.
   Qed.
 End CRedRRed.
 
+Module CRRed.
+  Inductive R {n} : Tm n -> Tm n ->  Prop :=
+  (****************** Beta ***********************)
+  | AppAbs a b :
+    R (App (Abs a) b)  (subst_Tm (scons b VarTm) a)
+  | AppPair a b c:
+    R (App (Pair a b) c) (Pair (App a c) (App b c))
+  | ProjAbs p a :
+    R (Proj p (Abs a)) (Abs (Proj p a))
+  | ProjPair p a b :
+    R (Proj p (Pair a b)) (if p is PL then a else b)
+  | IfAbs (a : Tm (S n)) b c :
+    R (If (Abs a) b c) (Abs (If a (ren_Tm shift b) (ren_Tm shift c)))
+  | IfPair a b c d :
+    R (If (Pair a b) c d) (Pair (If a c d) (If b c d))
+  | IfBool a b c :
+    R (If (BVal a) b c) (if a then b else c)
+  | IfApp a b c d :
+    R (If (App a b) c d) (App (If a c d) b)
+  | IfProj p a b c :
+    R (If (Proj p a) b c) (Proj p (If a b c))
+
+  (*************** Congruence ********************)
+  | AbsCong a0 a1 :
+    R a0 a1 ->
+    R (Abs a0) (Abs a1)
+  | AppCong0 a0 a1 b :
+    R a0 a1 ->
+    R (App a0 b) (App a1 b)
+  | AppCong1 a b0 b1 :
+    R b0 b1 ->
+    R (App a b0) (App a b1)
+  | PairCong0 a0 a1 b :
+    R a0 a1 ->
+    R (Pair a0 b) (Pair a1 b)
+  | PairCong1 a b0 b1 :
+    R b0 b1 ->
+    R (Pair a b0) (Pair a b1)
+  | ProjCong p a0 a1 :
+    R a0 a1 ->
+    R (Proj p a0) (Proj p a1)
+  | BindCong0 p A0 A1 B:
+    R A0 A1 ->
+    R (TBind p A0 B) (TBind p A1 B)
+  | BindCong1 p A B0 B1:
+    R B0 B1 ->
+    R (TBind p A B0) (TBind p A B1)
+  | IfCong0 a0 a1 b c :
+    R a0 a1 ->
+    R (If a0 b c) (If a1 b c)
+  | IfCong1 a b0 b1 c :
+    R b0 b1 ->
+    R (If a b0 c) (If a b1 c)
+  | IfCong2 a b c0 c1 :
+    R c0 c1 ->
+    R (If a b c0) (If a b c1).
+
+  Lemma AppAbs' n a (b t : Tm n) :
+    t = subst_Tm (scons b VarTm) a ->
+    R (App (Abs a) b) t.
+  Proof. move => ->. apply AppAbs. Qed.
+
+  Lemma IfAbs' n (a  : Tm (S n)) (b c : Tm n)  u :
+    u = (Abs (If a (ren_Tm shift b) (ren_Tm shift c))) ->
+    R (If (Abs a) b c) u.
+  Proof. move => ->. apply IfAbs. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    R a b -> R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    elim : n a b /h => n;
+      lazymatch goal with
+      | [|- context[App (Abs _) _]] => move => * /=; apply AppAbs'; by asimpl
+      | [|- context[If (BVal _) _]] => hauto l:on use:IfBool
+      | [|- context[Proj _ (Pair _ _)]] => hauto l:on use:ProjPair
+      | [|- context[If (Abs _) _]] => move => * /=; apply IfAbs'; by asimpl
+      | _ => qauto ctrs:R
+      end.
+  Qed.
+
+End CRRed.
+
+
+Module CRReds.
+
+  #[local]Ltac solve_s_rec :=
+  move => *; eapply rtc_l; eauto;
+         hauto lq:on ctrs:CRRed.R.
+
+  #[local]Ltac solve_s :=
+    repeat (induction 1; last by solve_s_rec); apply rtc_refl.
+
+  Lemma AbsCong n (a b : Tm (S n)) :
+    rtc CRRed.R a b ->
+    rtc CRRed.R (Abs a) (Abs b).
+  Proof. solve_s. Qed.
+
+  Lemma AppCong n (a0 a1 b0 b1 : Tm n) :
+    rtc CRRed.R a0 a1 ->
+    rtc CRRed.R b0 b1 ->
+    rtc CRRed.R (App a0 b0) (App a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma BindCong n p (a0 a1 : Tm n) b0 b1 :
+    rtc CRRed.R a0 a1 ->
+    rtc CRRed.R b0 b1 ->
+    rtc CRRed.R (TBind p a0 b0) (TBind p a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma PairCong n (a0 a1 b0 b1 : Tm n) :
+    rtc CRRed.R a0 a1 ->
+    rtc CRRed.R b0 b1 ->
+    rtc CRRed.R (Pair a0 b0) (Pair a1 b1).
+  Proof. solve_s. Qed.
+
+  Lemma ProjCong n p (a0 a1  : Tm n) :
+    rtc CRRed.R a0 a1 ->
+    rtc CRRed.R (Proj p a0) (Proj p a1).
+  Proof. solve_s. Qed.
+
+  Lemma IfCong n (a0 a1 b0 b1 c0 c1 : Tm n) :
+    rtc CRRed.R a0 a1 ->
+    rtc CRRed.R b0 b1 ->
+    rtc CRRed.R c0 c1 ->
+    rtc CRRed.R (If a0 b0 c0) (If a1 b1 c1).
+  Proof. solve_s. Qed.
+
+  Lemma renaming n m (a b : Tm n) (ξ : fin n -> fin m) :
+    rtc CRRed.R a b -> rtc CRRed.R (ren_Tm ξ a) (ren_Tm ξ b).
+  Proof.
+    move => h. move : m ξ.
+    induction h; hauto lq:on ctrs:rtc use:CRRed.renaming.
+  Qed.
+
+End CRReds.
+
+
 (* (***************** Beta rules only ***********************) *)
 (* Module RPar'. *)
 (*   Inductive R {n} : Tm n -> Tm n ->  Prop := *)
@@ -1733,10 +1871,10 @@ End RPars.
 Lemma Abs_EPar n a (b : Tm n) :
   EPar.R (Abs a) b ->
   (exists d, EPar.R a d /\
-     rtc RPar.R (App (ren_Tm shift b) (VarTm var_zero)) d) /\
+     rtc CRRed.R (App (ren_Tm shift b) (VarTm var_zero)) d) /\
          (exists d,
          EPar.R a d /\ forall p,
-         rtc RPar.R (Proj p b) (Abs (Proj p d))).
+         rtc CRRed.R (Proj p b) (Abs (Proj p d))).
 Proof.
   move E : (Abs a) => u h.
   move : a E.
@@ -1747,65 +1885,83 @@ Proof.
     split; exists d.
     + split => //.
       apply : rtc_l.
-      apply RPar.AppAbs; eauto => //=.
-      apply RPar.refl.
-      by apply RPar.refl.
+      apply CRRed.AppAbs; eauto => //=.
       move :ih1; substify; by asimpl.
     + split => // p.
       apply : rtc_l.
-      apply : RPar.ProjAbs.
-      by apply RPar.refl.
-      eauto using RPars.ProjCong, RPars.AbsCong.
+      apply : CRRed.ProjAbs.
+      eauto using CRReds.ProjCong, CRReds.AbsCong.
   - move => n ? a1 ha iha a0 ?. subst. specialize iha with (1 := eq_refl).
     move : iha => [_ [d [ih0 ih1]]].
     split.
     + exists (Pair (Proj PL d) (Proj PR d)).
       split; first by apply EPar.PairEta.
       apply : rtc_l.
-      apply RPar.AppPair; eauto using RPar.refl.
-      suff h : forall p, rtc RPar.R (App (Proj p (ren_Tm shift a1)) (VarTm var_zero)) (Proj p d) by
-          sfirstorder use:RPars.PairCong.
-      move => p. move /(_ p) /RPars.weakening in ih1.
+      apply CRRed.AppPair.
+      suff h : forall p, rtc CRRed.R (App (Proj p (ren_Tm shift a1)) (VarTm var_zero)) (Proj p d) by
+          sfirstorder use:CRReds.PairCong.
+      move => p. move /(_ p) /CRReds.renaming in ih1.
       apply relations.rtc_transitive with (y := App (ren_Tm shift (Abs (Proj p d))) (VarTm var_zero)).
-      by eauto using RPars.AppCong, rtc_refl.
+      by eauto using CRReds.AppCong, rtc_refl.
       apply relations.rtc_once => /=.
-      apply : RPar.AppAbs'; eauto using RPar.refl.
-      by asimpl.
+      apply : CRRed.AppAbs'. by asimpl.
     + exists d. repeat split => //. move => p.
       apply : rtc_l; eauto.
-      hauto q:on use:RPar.ProjPair', RPar.refl.
+      case : p; sfirstorder use:CRRed.ProjPair.
   - move => n a0 a1 ha _ ? [*]. subst.
     split.
     + exists a1. split => //.
-      apply rtc_once. apply : RPar.AppAbs'; eauto using RPar.refl. by asimpl.
+      apply rtc_once. apply : CRRed.AppAbs'. by asimpl.
     + exists a1. split => // p.
-      apply rtc_once. apply : RPar.ProjAbs; eauto using RPar.refl.
+      apply rtc_once. apply : CRRed.ProjAbs.
 Qed.
 
 Lemma Abs_EPar_If n (a : Tm (S n)) q :
   EPar.R (Abs a) q ->
   exists d, EPar.R a d /\
-         forall b c, rtc RPar.R (If q b c) (Abs (If d (ren_Tm shift b) (ren_Tm shift c))).
+         forall b c, exists e, rtc CRRed.R (If q b c) e /\ rtc OExp.R (Abs (If d (ren_Tm shift b) (ren_Tm shift c))) e.
 Proof.
   move E : (Abs a) => u h.
   move : a E.
   elim : n u q /h => //= n.
-  - move => a0 a1 ha _ b ?. subst.
-    move /Abs_EPar : ha.
-    move => [[d [h0 h1]] _].
+  - move => a0 a1 ha iha b ?. subst.
+    (* move /Abs_EPar : ha. *)
+    spec_refl.
+    move : iha => [d [hd h]].
     exists d.
-    split => // b0 c.
-    apply : rtc_l.
-    apply RPar.IfAbs; auto using RPar.refl.
-    apply RPars.AbsCong.
-    apply RPars.IfCong; auto using rtc_refl.
-  - move => a0 a1 ha _ a ?. subst.
-    move /Abs_EPar : ha => [_ [d [h0 h1]]].
+    split => //.
+    move => b0 c0.
+    move /(_ b0 c0) : h.
+    move => [e [h0 h1]].
+    exists (Abs (App (ren_Tm shift e) (VarTm var_zero))).
+    split.
+    apply : rtc_l. apply CRRed.IfAbs.
+    apply : rtc_l. apply CRRed.AbsCong.
+    apply CRRed.IfApp.
+    apply CRReds.AbsCong. apply CRReds.AppCong; eauto using rtc_refl.
+    change (If (ren_Tm shift a1) (ren_Tm shift b0) (ren_Tm shift c0)) with (ren_Tm shift (If a1 b0 c0)).
+    hauto lq:on use:CRReds.renaming.
+    apply : rtc_r; eauto.
+    apply OExp.AppEta.
+  - move => a0 a1 ha iha a ?. subst.
+    spec_refl.
+    move : iha => [d [h0 h1]].
     exists d. split => //.
-    move => b c.
+    move => b c. move/(_ b c ): h1 => [e [h1 h2]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.PairEta.
     apply : rtc_l.
-    apply RPar.IfPair; auto using RPar.refl.
-Admitted.
+    apply CRRed.IfPair.
+    apply : rtc_l.
+    apply CRRed.PairCong0.
+    apply CRRed.IfProj.
+    apply : rtc_l.
+    apply CRRed.PairCong1.
+    apply CRRed.IfProj.
+    by apply CRReds.PairCong; apply CRReds.ProjCong.
+  - sauto lq: on.
+Qed.
 
 
 Lemma Pair_EPar n (a b c : Tm n) :
