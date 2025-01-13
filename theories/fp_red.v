@@ -1936,6 +1936,34 @@ Proof.
       apply rtc_once. apply : CRRed.ProjAbs.
 Qed.
 
+Lemma BVal_EPar_If n (v : bool) q :
+  EPar.R (BVal v : Tm n) q ->
+  forall b c, exists e, rtc CRRed.R (If q b c) e /\ rtc OExp.R (if v then b else c) e.
+Proof.
+  move E :(BVal v) => u h. move : v E.
+  elim : n u q /h => //=.
+  - move => n a0 a1 ha iha v ? b c. subst.
+    spec_refl.
+    move /(_ b c) : iha => [e [h0 h1]].
+    eexists. split; cycle 1.
+    apply : rtc_r; eauto. apply OExp.AppEta.
+    apply : rtc_l. apply CRRed.IfAbs.
+    apply CRReds.AbsCong.
+    apply : rtc_l. apply CRRed.IfApp.
+    apply CRReds.AppCong; auto using rtc_refl.
+    set (x := If _ _ _).
+    change x with (ren_Tm shift (If a1 b c)).
+    eauto using CRReds.renaming.
+  - move => n a0 a1 ha iha v ? b c. subst.
+    spec_refl.
+    move /(_ b c) : iha => [e [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto. apply OExp.PairEta.
+    apply : rtc_l. apply CRRed.IfPair.
+    apply CRReds.PairCong; hauto lq:on ctrs:rtc use:CRRed.IfProj, CRReds.ProjCong.
+  - sauto lq:on.
+Qed.
+
 Lemma Proj_EPar_If n p (a : Tm n) q :
   EPar.R (Proj p a) q ->
   exists d, EPar.R a d /\
@@ -1972,6 +2000,43 @@ Proof.
     apply CRRed.IfPair.
     apply CRReds.PairCong; hauto lq:on ctrs:rtc use:CRRed.IfProj, CRReds.ProjCong.
   - sauto lq:on rew:off.
+Qed.
+
+Lemma App_EPar_If n (r0 r1 : Tm n) q :
+  EPar.R (App r0 r1) q ->
+  exists d0 d1, EPar.R r0 d0 /\ EPar.R r1 d1 /\
+             forall b c, exists e, rtc CRRed.R (If q b c) e /\ rtc OExp.R (App (If d0 b c) d1) e.
+Proof.
+  move E : (App r0 r1) => u h.
+  move : r0 r1 E.
+  elim : n u q /h => //= n.
+  - move => a0 a1 ha iha r0 r1 ?. subst.
+    spec_refl.
+    move : iha => [d0 [d1 [ih0 [ih1 ih2]]]].
+    exists d0, d1. repeat split => //.
+    move => b c.
+    move /(_ b c) : ih2 => [e [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.AppEta.
+    apply : rtc_l. apply CRRed.IfAbs.
+    apply CRReds.AbsCong.
+    apply : rtc_l. apply CRRed.IfApp.
+    apply CRReds.AppCong; auto using rtc_refl.
+    set (x := If _ _ _).
+    change x with (ren_Tm shift (If a1 b c)).
+    auto using CRReds.renaming.
+  - move => a0 a1 ha iha r0 r1 ?. subst.
+    spec_refl. move : iha => [d0 [d1 [ih0 [ih1 ih2]]]].
+    exists d0, d1. (repeat split) => // b c.
+    move /(_ b c) : ih2 => [d [h0 h1]].
+    eexists; split; cycle 1.
+    apply : rtc_r; eauto.
+    apply OExp.PairEta.
+    apply : rtc_l. apply CRRed.IfPair.
+    apply CRReds.PairCong;
+    hauto lq:on ctrs:rtc use:CRRed.IfProj, CRReds.ProjCong, CRReds.AppCong.
+  - sauto lq:on.
 Qed.
 
 Lemma Pair_EPar_If n (r0 r1 : Tm n) q :
@@ -2190,10 +2255,16 @@ Proof.
       exists e. split => //.
       hauto lq:on ctrs:EPar.R use:EPar.renaming, OExp.merge.
     + move => a2 b2 c [*] {iha ihb ihc}. subst.
-      admit.
+      move /BVal_EPar_If : ha.
+      move /(_ b1 c1) => [e [h0 h1]].
+      exists e. split => //.
+      hauto lq:on ctrs:EPar.R use:EPar.renaming, OExp.merge.
     + (* Need the rule that if commutes with abs *)
-      move => a2 b2 c d [*]. subst.
-      admit.
+      move => a2 b2 c d {iha ihb ihc} [*]. subst.
+      move /App_EPar_If : ha => [r0 [r1 [h0 [h1 h2]]]].
+      move /(_ b1 c1) : h2 => [e [h3 h4]].
+      exists e. split => //.
+      hauto lq:on ctrs:EPar.R use:EPar.renaming, OExp.merge.
     + move => p a2 b2 c [*]. subst.
       move {iha ihb ihc}.
       move /Proj_EPar_If : ha => [d [h0 /(_ b1 c1) [e [h1 h2]]]].
@@ -2211,10 +2282,10 @@ Proof.
       move /ihc => {ihc} [c [? ?]].
       exists (If a1 b1 c).
       hauto lq:on ctrs:rtc,EPar.R use:CRReds.IfCong.
-Admitted.
+Qed.
 
 Lemma commutativity1 n (a b0 b1 : Tm n) :
-  EPar.R a b0 -> rtc RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ EPar.R b1 c.
+  EPar.R a b0 -> rtc CRRed.R a b1 -> exists c, rtc CRRed.R b0 c /\ EPar.R b1 c.
 Proof.
   move => + h. move : b0.
   elim : a b1 / h.
@@ -2223,7 +2294,7 @@ Proof.
 Qed.
 
 Lemma commutativity n (a b0 b1 : Tm n) :
-  rtc EPar.R a b0 -> rtc RPar.R a b1 -> exists c, rtc RPar.R b0 c /\ rtc EPar.R b1 c.
+  rtc EPar.R a b0 -> rtc CRRed.R a b1 -> exists c, rtc CRRed.R b0 c /\ rtc EPar.R b1 c.
   move => h. move : b1. elim : a b0 /h.
   - sfirstorder.
   - move => a0 a1 a2 + ha1 ih b1 +.
@@ -2392,55 +2463,49 @@ Proof.
   - admit.
 Admitted.
 
-Function tstar' {n} (a : Tm n) :=
-  match a with
-  | VarTm i => a
-  | Abs a => Abs (tstar' a)
-  | App (Abs a) b => subst_Tm (scons (tstar' b) VarTm) (tstar' a)
-  | App a b => App (tstar' a) (tstar' b)
-  | Pair a b => Pair (tstar' a) (tstar' b)
-  | Proj p (Pair a b) => if p is PL then (tstar' a) else (tstar' b)
-  | Proj p a => Proj p (tstar' a)
-  | TBind p a b => TBind p (tstar' a) (tstar' b)
-  | Bot => Bot
-  | Univ i => Univ i
-  end.
+(* Function tstar' {n} (a : Tm n) := *)
+(*   match a with *)
+(*   | VarTm i => a *)
+(*   | Abs a => Abs (tstar' a) *)
+(*   | App (Abs a) b => subst_Tm (scons (tstar' b) VarTm) (tstar' a) *)
+(*   | App a b => App (tstar' a) (tstar' b) *)
+(*   | Pair a b => Pair (tstar' a) (tstar' b) *)
+(*   | Proj p (Pair a b) => if p is PL then (tstar' a) else (tstar' b) *)
+(*   | Proj p a => Proj p (tstar' a) *)
+(*   | TBind p a b => TBind p (tstar' a) (tstar' b) *)
+(*   | Bot => Bot *)
+(*   | Univ i => Univ i *)
+(*   end. *)
 
-Lemma RPar'_triangle n (a : Tm n) : forall b, RPar'.R a b -> RPar'.R b (tstar' a).
-Proof.
-  apply tstar'_ind => {n a}.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-  - hauto lq:on use:RPar'.cong, RPar'.refl ctrs:RPar'.R inv:RPar'.R.
-  - hauto lq:on rew:off ctrs:RPar'.R inv:RPar'.R.
-  - hauto lq:on rew:off inv:RPar'.R ctrs:RPar'.R.
-  - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'.
-  - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-  - hauto lq:on inv:RPar'.R ctrs:RPar'.R.
-Qed.
+(* Lemma RPar'_triangle n (a : Tm n) : forall b, RPar'.R a b -> RPar'.R b (tstar' a). *)
+(* Proof. *)
+(*   apply tstar'_ind => {n a}. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto lq:on use:RPar'.cong, RPar'.refl ctrs:RPar'.R inv:RPar'.R. *)
+(*   - hauto lq:on rew:off ctrs:RPar'.R inv:RPar'.R. *)
+(*   - hauto lq:on rew:off inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'. *)
+(*   - hauto drew:off inv:RPar'.R use:RPar'.refl, RPar'.ProjPair'. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(*   - hauto lq:on inv:RPar'.R ctrs:RPar'.R. *)
+(* Qed. *)
 
-Lemma RPar_diamond n (c a1 b1 : Tm n) :
-  RPar.R c a1 ->
-  RPar.R c b1 ->
-  exists d2, RPar.R a1 d2 /\ RPar.R b1 d2.
-Proof. hauto l:on use:RPar_triangle. Qed.
+(* Lemma RPar'_diamond n (c a1 b1 : Tm n) : *)
+(*   RPar'.R c a1 -> *)
+(*   RPar'.R c b1 -> *)
+(*   exists d2, RPar'.R a1 d2 /\ RPar'.R b1 d2. *)
+(* Proof. hauto l:on use:RPar'_triangle. Qed. *)
 
-Lemma RPar'_diamond n (c a1 b1 : Tm n) :
-  RPar'.R c a1 ->
-  RPar'.R c b1 ->
-  exists d2, RPar'.R a1 d2 /\ RPar'.R b1 d2.
-Proof. hauto l:on use:RPar'_triangle. Qed.
-
-Lemma RPar_confluent n (c a1 b1 : Tm n) :
-  rtc RPar.R c a1 ->
-  rtc RPar.R c b1 ->
-  exists d2, rtc RPar.R a1 d2 /\ rtc RPar.R b1 d2.
-Proof.
-  sfirstorder use:relations.diamond_confluent, RPar_diamond.
-Qed.
+(* Lemma RPar_confluent n (c a1 b1 : Tm n) : *)
+(*   rtc RPar.R c a1 -> *)
+(*   rtc RPar.R c b1 -> *)
+(*   exists d2, rtc RPar.R a1 d2 /\ rtc RPar.R b1 d2. *)
+(* Proof. *)
+(*   sfirstorder use:relations.diamond_confluent, RPar_diamond. *)
+(* Qed. *)
 
 Lemma EPar_confluent n (c a1 b1 : Tm n) :
   rtc EPar.R c a1 ->
