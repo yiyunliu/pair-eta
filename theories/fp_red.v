@@ -2409,6 +2409,36 @@ Lemma Univ_EPar' n i (u : Tm n) :
   - hauto l:on ctrs:OExp.R.
 Qed.
 
+Lemma BVal_EPar' n i (u : Tm n) :
+  EPar.R (BVal i) u ->
+  rtc OExp.R (BVal i) u.
+  move E : (BVal i) => t h.
+  move : E. elim : n t u /h => //=.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => n a0 a1 h ih ?. subst.
+    specialize ih with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
+Lemma If_EPar' n (a b c u : Tm n)  :
+  EPar.R (If a b c) u ->
+  (exists a0 b0 c0, EPar.R a a0 /\ EPar.R b b0 /\ EPar.R c c0 /\ rtc OExp.R (If a0 b0 c0) u).
+Proof.
+  move E : (If a b c) => t h.
+  move : a b c E. elim : n t u /h => //= n.
+  - move => a0 a1 ha iha a b c ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - move => a0 a1 ha iha a b c ?. subst.
+    specialize iha with (1 := eq_refl).
+    hauto lq:on ctrs:OExp.R use:rtc_r.
+  - hauto l:on ctrs:OExp.R.
+Qed.
+
+
 Lemma EPar_diamond n (c a1 b1 : Tm n) :
   EPar.R c a1 ->
   EPar.R c b1 ->
@@ -2456,12 +2486,19 @@ Proof.
     move : OExp.commutativity0 h2; repeat move/[apply].
     move => [d h].
     exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
-  - qauto use:Bot_EPar', EPar.refl.
-  - qauto use:Univ_EPar', EPar.refl.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - qauto use:EPar.refl.
+  - qauto use:EPar.refl.
+  - hauto lq:on use:EPar.refl.
+  - hauto lq:on use:EPar.refl.
+  - move => n a0 a1 b0 b1 c0 c1 ha iha hb ihb hc ihc u.
+    move /If_EPar' => [a2 [b2 [c2 [h0 [h1 [h2 h3]]]]]].
+    have {}/iha := h0. have {}/ihb := h1. have {}/ihc := h2.
+    move => [c hc0]. move => [b hb0]. move => [a ha0].
+    have : EPar.R (If a2 b2 c2) (If a b c) by hauto lq:on ctrs:EPar.R.
+    move : OExp.commutativity0 h3. repeat move/[apply].
+    move => [d ?].
+    exists d. hauto lq:on rew:off ctrs:EPar.R use:OExp.merge.
+Qed.
 
 (* Function tstar' {n} (a : Tm n) := *)
 (*   match a with *)
